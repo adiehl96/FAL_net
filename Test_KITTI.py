@@ -43,7 +43,7 @@ parser.add_argument('-save', '--save', default=False)
 parser.add_argument('-save_pc', '--save_pc', default=False)
 parser.add_argument('-save_pan', '--save_pan', default=False)
 parser.add_argument('-save_input', '--save_input', default=False)
-parser.add_argument('-w', '--workers', metavar='Workers', default=4)
+parser.add_argument('-w', '--workers', metavar='Workers', default=4, type=int)
 parser.add_argument('--sparse', default=False, action='store_true',
                     help='Depth GT is sparse, automatically seleted when choosing a KITTIdataset')
 parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency')
@@ -109,6 +109,8 @@ def main():
                                                           transform=input_transform,
                                                           target_transform=target_transform)
 
+    print
+    print("len(test_dataset)", len(test_dataset))
     # Torch Data Loader
     args.batch_size = 1  # kitty mixes image sizes!
     args.sparse = True  # disparities are sparse (from lidar)
@@ -117,16 +119,19 @@ def main():
 
     # create pan model
     model_dir = os.path.join(args.dataset, args.time_stamp, args.model + args.details)
-    pan_network_data = torch.load(model_dir)
+    print(model_dir)
+    pan_network_data = torch.load(model_dir, map_location=torch.device('cpu'))
+    # print(pan_network_data)
     pan_model = pan_network_data['m_model']
     print("=> using pre-trained model for pan '{}'".format(pan_model))
-    pan_model = models.__dict__[pan_model](pan_network_data, no_levels=args.no_levels).cuda()
-    pan_model = torch.nn.DataParallel(pan_model, device_ids=[0]).cuda()
+    pan_model = models.__dict__[pan_model](pan_network_data, no_levels=args.no_levels)#.cuda()
+    pan_model = torch.nn.DataParallel(pan_model, device_ids=[])#.cuda()
     pan_model.eval()
     model_parameters = utils.get_n_params(pan_model)
     print("=> Number of parameters '{}'".format(model_parameters))
     cudnn.benchmark = True
 
+    print("len(val_loader)", len(val_loader))
     # evaluate on validation set
     validate(val_loader, pan_model, save_path, model_parameters)
 
@@ -161,10 +166,12 @@ def validate(val_loader, pan_model, save_path, model_param):
     right_shift = args.max_disp * args.rel_baselne
 
     with torch.no_grad():
+        print("with torch.no_grad():")
         for i, (input, target, f_name) in enumerate(val_loader):
-            target = target[0].cuda()
-            input_left = input[0].cuda()
-            input_right = input[1].cuda()
+            print("for i, (input, target, f_name) in enumerate(val_loader):", i, input)
+            target = target[0]#.cuda()
+            input_left = input[0]#.cuda()
+            input_right = input[1]#.cuda()
             if args.tdataName == 'Owndata':
                 B, C, H, W = input_left.shape
                 input_left = input_left[:,:,0:int(0.95*H),:]
@@ -172,7 +179,7 @@ def validate(val_loader, pan_model, save_path, model_param):
             B, C, H, W = input_left.shape
 
             # Prepare flip grid for post-processing
-            i_tetha = torch.zeros(B, 2, 3).cuda()
+            i_tetha = torch.zeros(B, 2, 3)#.cuda()
             i_tetha[:, 0, 0] = 1
             i_tetha[:, 1, 1] = 1
             flip_grid = F.affine_grid(i_tetha, [B, C, H, W])
@@ -217,7 +224,7 @@ def validate(val_loader, pan_model, save_path, model_param):
 
                 if args.save_pc:
                     # equalize tone
-                    m_rgb = torch.ones((B, C, 1, 1)).cuda()
+                    m_rgb = torch.ones((B, C, 1, 1))#.cuda()
                     m_rgb[:, 0, :, :] = 0.411 * m_rgb[:, 0, :, :]
                     m_rgb[:, 1, :, :] = 0.432 * m_rgb[:, 1, :, :]
                     m_rgb[:, 2, :, :] = 0.45 * m_rgb[:, 2, :, :]
@@ -226,6 +233,7 @@ def validate(val_loader, pan_model, save_path, model_param):
                                            os.path.join(pc_path, '{:010d}.ply'.format(i)))
 
                 if args.save_input:
+                    print("save the input image in path",input_path)
                     denormalize = np.array([0.411, 0.432, 0.45])
                     denormalize = denormalize[:, np.newaxis, np.newaxis]
                     p_im = input_left.squeeze().cpu().numpy() + denormalize
@@ -360,7 +368,7 @@ if __name__ == '__main__':
     import os
 
     args = parser.parse_args()
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_no
+    # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_no
 
     import torch
     import torch.utils.data
