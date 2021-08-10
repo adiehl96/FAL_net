@@ -103,13 +103,12 @@ def main():
     # Torch Data Set List
     input_path = os.path.join(args.data, args.tdataName)
     [test_dataset, _] = Datasets.__dict__[args.tdataName](split=1,  # all to be tested
-                                                          root=input_path,
+                                                          root=args.data,
                                                           disp=True,
                                                           shuffle_test=False,
                                                           transform=input_transform,
                                                           target_transform=target_transform)
 
-    print
     print("len(test_dataset)", len(test_dataset))
     # Torch Data Loader
     args.batch_size = 1  # kitty mixes image sizes!
@@ -168,7 +167,7 @@ def validate(val_loader, pan_model, save_path, model_param):
     with torch.no_grad():
         print("with torch.no_grad():")
         for i, (input, target, f_name) in enumerate(val_loader):
-            print("for i, (input, target, f_name) in enumerate(val_loader):", i, input)
+            print("for i, (input, target, f_name) in enumerate(val_loader):", i)
             target = target[0]#.cuda()
             input_left = input[0]#.cuda()
             input_right = input[1]#.cuda()
@@ -182,7 +181,7 @@ def validate(val_loader, pan_model, save_path, model_param):
             i_tetha = torch.zeros(B, 2, 3)#.cuda()
             i_tetha[:, 0, 0] = 1
             i_tetha[:, 1, 1] = 1
-            flip_grid = F.affine_grid(i_tetha, [B, C, H, W])
+            flip_grid = F.affine_grid(i_tetha, [B, C, H, W], align_corners=False)
             flip_grid[:, :, :, 0] = -flip_grid[:, :, :, 0]
 
             # Convert min and max disp to bx1x1 tensors
@@ -204,9 +203,9 @@ def validate(val_loader, pan_model, save_path, model_param):
                 feats = None
 
             if args.f_post_process:
-                flip_disp = pan_model(F.grid_sample(input_left, flip_grid), min_disp, max_disp,
+                flip_disp = pan_model(F.grid_sample(input_left, flip_grid, align_corners=False), min_disp, max_disp,
                                       ret_disp=True, ret_pan=False, ret_subocc=False)
-                flip_disp = F.grid_sample(flip_disp, flip_grid)
+                flip_disp = F.grid_sample(flip_disp, flip_grid, align_corners=False)
                 disp = (disp + flip_disp) / 2
             elif args.ms_post_process:
                 disp = ms_pp(input_left, pan_model, flip_grid, disp, min_disp, max_disp)
@@ -296,11 +295,11 @@ def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):
     B, C, H, W = input_view.shape
 
     up_fac = 2/3
-    upscaled = F.interpolate(F.grid_sample(input_view, flip_grid), scale_factor=up_fac, mode='bilinear',
-                             align_corners=True)
+    upscaled = F.interpolate(F.grid_sample(input_view, flip_grid, align_corners=False), scale_factor=up_fac, mode='bilinear',
+                             align_corners=True, recompute_scale_factor=True)
     dwn_flip_disp = pan_model(upscaled, min_disp, max_pix, ret_disp=True, ret_pan=False, ret_subocc=False)
     dwn_flip_disp = (1 / up_fac) * F.interpolate(dwn_flip_disp, size=(H, W), mode='nearest')#, align_corners=True)
-    dwn_flip_disp = F.grid_sample(dwn_flip_disp, flip_grid)
+    dwn_flip_disp = F.grid_sample(dwn_flip_disp, flip_grid, align_corners=False)
 
     norm = disp / (np.percentile(disp.detach().cpu().numpy(), 95) + 1e-6)
     norm[norm > 1] = 1
