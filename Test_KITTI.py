@@ -60,7 +60,7 @@ parser.add_argument('-w', '--workers', metavar='Workers', default=4, type=int)
 parser.add_argument('--sparse', default=False, action='store_true',
                     help='Depth GT is sparse, automatically seleted when choosing a KITTIdataset')
 parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency')
-parser.add_argument('-gpu_no', '--gpu_no', default=0, type=int, help='Select your GPU ID, if you have multiple GPU.')
+parser.add_argument('-gpu_no', '--gpu_no', default=[], type=int, nargs='+', help='Number of available GPUs, use None to train on CPU')
 parser.add_argument('-dt', '--dataset', help='Dataset and training stage directory', default='Kitti_stage2')
 parser.add_argument('-ts', '--time_stamp', help='Model timestamp', default='10-18-15_42')
 parser.add_argument('-m', '--model', help='Model', default='FAL_netB')
@@ -89,8 +89,7 @@ def display_config(save_path):
 
 
 def main(device="cpu"):
-    if args.gpu_no:
-        print('-------Testing on gpu ' + device + '-------')
+    print('-------Testing on ' + str(device) + '-------')
 
     save_path = os.path.join('Test_Results', args.tdataName, args.model, args.time_stamp)
     if args.f_post_process:
@@ -138,7 +137,9 @@ def main(device="cpu"):
     pan_model = pan_network_data['m_model']
     print("=> using pre-trained model for pan '{}'".format(pan_model))
     pan_model = models.__dict__[pan_model](pan_network_data, no_levels=args.no_levels, device=device).to(device)
-    pan_model = torch.nn.DataParallel(pan_model, device_ids=[0]).to(device)
+    pan_model = torch.nn.DataParallel(pan_model).to(device)
+    if device.type == "cpu":
+        pan_model = pan_model.module.to(device)
     pan_model.eval()
     model_parameters = utils.get_n_params(pan_model)
     print("=> Number of parameters '{}'".format(model_parameters))
@@ -381,9 +382,10 @@ if __name__ == '__main__':
     import os
 
     args = parser.parse_args()
-    os.environ['CUDA_VISIBLE_DEVICES'] = f"{args.gpu_no}"
 
-    device = torch.device(f"cuda:{args.gpu_no}" if args.gpu_no else "cpu")
+    device = torch.device("cuda" if args.gpu_no else "cpu")
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = ', '.join([str(item) for item in args.gpu_no])
 
     args = parser.parse_args()
 

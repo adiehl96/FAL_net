@@ -43,7 +43,7 @@ def Kitti_eigen_test_improved(split, **kwargs):
                 eigen_test_improved_list.append([[inputleft, inputright],[groundtruthleft, velodyneleft]])
         
         test_list = eigen_test_improved_list
-        test_list = test_list[:2]
+        #test_list = test_list[:2]
     
     print("len(test_list)", len(test_list))
     
