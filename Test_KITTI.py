@@ -26,6 +26,19 @@ from PIL import Image
 import Datasets
 import models
 
+import torch
+import torch.utils.data
+import torch.nn.parallel
+import torch.backends.cudnn as cudnn
+import torchvision.transforms as transforms
+import torch.nn.functional as F
+
+import myUtils as utils
+import data_transforms
+from loss_functions import realEPE
+
+
+
 dataset_names = sorted(name for name in Datasets.__all__)
 model_names = sorted(name for name in models.__all__)
 
@@ -47,7 +60,7 @@ parser.add_argument('-w', '--workers', metavar='Workers', default=4, type=int)
 parser.add_argument('--sparse', default=False, action='store_true',
                     help='Depth GT is sparse, automatically seleted when choosing a KITTIdataset')
 parser.add_argument('--print-freq', '-p', default=10, type=int, metavar='N', help='print frequency')
-parser.add_argument('-gpu_no', '--gpu_no', default='1', help='Select your GPU ID, if you have multiple GPU.')
+parser.add_argument('-gpu_no', '--gpu_no', default=0, type=int, help='Select your GPU ID, if you have multiple GPU.')
 parser.add_argument('-dt', '--dataset', help='Dataset and training stage directory', default='Kitti_stage2')
 parser.add_argument('-ts', '--time_stamp', help='Model timestamp', default='10-18-15_42')
 parser.add_argument('-m', '--model', help='Model', default='FAL_netB')
@@ -75,8 +88,9 @@ def display_config(save_path):
         f.write(settings)
 
 
-def main():
-    print('-------Testing on gpu ' + args.gpu_no + '-------')
+def main(device="cpu"):
+    if args.gpu_no:
+        print('-------Testing on gpu ' + device + '-------')
 
     save_path = os.path.join('Test_Results', args.tdataName, args.model, args.time_stamp)
     if args.f_post_process:
@@ -119,12 +133,12 @@ def main():
     # create pan model
     model_dir = os.path.join(args.dataset, args.time_stamp, args.model + args.details)
     print(model_dir)
-    pan_network_data = torch.load(model_dir, map_location=torch.device('cpu'))
+    pan_network_data = torch.load(model_dir, map_location=torch.device(device))
     # print(pan_network_data)
     pan_model = pan_network_data['m_model']
     print("=> using pre-trained model for pan '{}'".format(pan_model))
-    pan_model = models.__dict__[pan_model](pan_network_data, no_levels=args.no_levels)#.cuda()
-    pan_model = torch.nn.DataParallel(pan_model, device_ids=[])#.cuda()
+    pan_model = models.__dict__[pan_model](pan_network_data, no_levels=args.no_levels).to(device)
+    pan_model = torch.nn.DataParallel(pan_model, device_ids=[0]).to(device)
     pan_model.eval()
     model_parameters = utils.get_n_params(pan_model)
     print("=> Number of parameters '{}'".format(model_parameters))
@@ -168,9 +182,9 @@ def validate(val_loader, pan_model, save_path, model_param):
         print("with torch.no_grad():")
         for i, (input, target, f_name) in enumerate(val_loader):
             print("for i, (input, target, f_name) in enumerate(val_loader):", i)
-            target = target[0]#.cuda()
-            input_left = input[0]#.cuda()
-            input_right = input[1]#.cuda()
+            target = target[0].to(device)
+            input_left = input[0].to(device)
+            input_right = input[1].to(device)
             if args.tdataName == 'Owndata':
                 B, C, H, W = input_left.shape
                 input_left = input_left[:,:,0:int(0.95*H),:]
@@ -178,7 +192,7 @@ def validate(val_loader, pan_model, save_path, model_param):
             B, C, H, W = input_left.shape
 
             # Prepare flip grid for post-processing
-            i_tetha = torch.zeros(B, 2, 3)#.cuda()
+            i_tetha = torch.zeros(B, 2, 3).to(device)
             i_tetha[:, 0, 0] = 1
             i_tetha[:, 1, 1] = 1
             flip_grid = F.affine_grid(i_tetha, [B, C, H, W], align_corners=False)
@@ -223,7 +237,7 @@ def validate(val_loader, pan_model, save_path, model_param):
 
                 if args.save_pc:
                     # equalize tone
-                    m_rgb = torch.ones((B, C, 1, 1))#.cuda()
+                    m_rgb = torch.ones((B, C, 1, 1)).to(device)
                     m_rgb[:, 0, :, :] = 0.411 * m_rgb[:, 0, :, :]
                     m_rgb[:, 1, :, :] = 0.432 * m_rgb[:, 1, :, :]
                     m_rgb[:, 2, :, :] = 0.45 * m_rgb[:, 2, :, :]
@@ -367,22 +381,10 @@ if __name__ == '__main__':
     import os
 
     args = parser.parse_args()
-    # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_no
+    os.environ['CUDA_VISIBLE_DEVICES'] = f"{args.gpu_no}"
 
-    import torch
-    import torch.utils.data
-    import torch.nn.parallel
-    import torch.backends.cudnn as cudnn
-    import torchvision.transforms as transforms
-    import torch.nn.functional as F
-
-    # Usefull tensorboard call
-    # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
-
-    import myUtils as utils
-    import data_transforms
-    from loss_functions import realEPE
+    device = torch.device(f"cuda:{args.gpu_no}" if args.gpu_no else "cpu")
 
     args = parser.parse_args()
 
-    main()
+    main(device)

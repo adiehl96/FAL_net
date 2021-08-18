@@ -19,6 +19,13 @@ KITTI/year_month_day_drive_number_sync/image_00/data/0000000001.png
 
 Furthermore you will need to download some of the files from the [cvlibs depth challenge](http://www.cvlibs.net/datasets/kitti/eval_depth_all.php), called data_depth_velodyne.zip and data_depth_annotated.zip. Download and extract the contents and merge them into the main KITTI dataset. On MacOS, you can this by pressing the option key while dragging and dropping the folders from the depth challenge and selecting the merge option in the prompt.
 
+
+## Usefull tensorboard call
+
+```
+tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
+```
+
 ## Cite our paper:
 ```
 @inproceedings{NEURIPS2020_951124d4,
