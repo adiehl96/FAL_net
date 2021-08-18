@@ -84,7 +84,7 @@ def Kitti_eigen_test_improved(split, **kwargs):
             )
 
         # todo
-        test_list = test_list[:2]
+        test_list = test_list[:40]
 
     print("len(test_list)", len(test_list))
 
