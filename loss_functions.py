@@ -5,10 +5,10 @@ from torchvision import models
 
 # Define VGG19
 class Vgg19_pc(torch.nn.Module):
-    def __init__(self, requires_grad=False):
+    def __init__(self, requires_grad=False, device="cpu"):
         super(Vgg19_pc, self).__init__()
         vgg_pretrained_features = models.vgg19(pretrained=True).features
-        vgg_pretrained_features = nn.DataParallel(vgg_pretrained_features)
+        vgg_pretrained_features = nn.DataParallel(vgg_pretrained_features.to(device))
 
         # This has Vgg config E:
         # partial convolution paper uses up to pool3

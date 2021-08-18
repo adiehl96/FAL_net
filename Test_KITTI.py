@@ -137,7 +137,7 @@ def main(device="cpu"):
     # print(pan_network_data)
     pan_model = pan_network_data['m_model']
     print("=> using pre-trained model for pan '{}'".format(pan_model))
-    pan_model = models.__dict__[pan_model](pan_network_data, no_levels=args.no_levels).to(device)
+    pan_model = models.__dict__[pan_model](pan_network_data, no_levels=args.no_levels, device=device).to(device)
     pan_model = torch.nn.DataParallel(pan_model, device_ids=[0]).to(device)
     pan_model.eval()
     model_parameters = utils.get_n_params(pan_model)
