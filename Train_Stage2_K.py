@@ -238,10 +238,7 @@ def main(device="cpu"):
     )
 
     target_transform = transforms.Compose(
-        [
-            data_transforms.ArrayToTensor(),
-            transforms.Normalize(mean=[0], std=[1]),
-        ]
+        [data_transforms.ArrayToTensor(), transforms.Normalize(mean=[0], std=[1]),]
     )
 
     # Torch Data Set List
