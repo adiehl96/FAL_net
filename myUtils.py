@@ -7,6 +7,29 @@ import shutil
 import numpy as np
 
 
+def display_config(args, save_path):
+    settings = ""
+    settings = (
+        settings + "############################################################\n"
+    )
+    settings = (
+        settings + "# FAL-net        -         Pytorch implementation          #\n"
+    )
+    settings = (
+        settings + "# by Juan Luis Gonzalez   juanluisgb@kaist.ac.kr           #\n"
+    )
+    settings = (
+        settings + "############################################################\n"
+    )
+    settings = settings + "-------YOUR TRAINING SETTINGS---------\n"
+    for arg in vars(args):
+        settings = settings + "%15s: %s\n" % (str(arg), str(getattr(args, arg)))
+    print(settings)
+    # Save config in txt file
+    with open(os.path.join(save_path, "settings.txt"), "w+") as f:
+        f.write(settings)
+
+
 def save_checkpoint(state, is_best, save_path, filename="checkpoint.pth.tar"):
     torch.save(state, os.path.join(save_path, filename))
     if is_best:
@@ -28,38 +51,6 @@ def disp2rgb(disp_map, max_value):
     rgb_map[0, :, :] = normalized_disp_map
     rgb_map[1, :, :] = normalized_disp_map
     rgb_map[2, :, :] = normalized_disp_map
-    return rgb_map.clip(0, 1)
-
-
-def flow2rgb(flow_map, max_value):
-    _, h, w = flow_map.shape
-    flow_map[:, (flow_map[0] == 0) & (flow_map[1] == 0)] = float("nan")
-    rgb_map = np.ones((3, h, w)).astype(np.float32)
-    if max_value is not None:
-        normalized_flow_map = flow_map / max_value
-    else:
-        normalized_flow_map = flow_map / (np.abs(flow_map).max())
-    rgb_map[0, :, :] += normalized_flow_map[0, :, :]
-    rgb_map[1, :, :] -= 0.5 * (
-        normalized_flow_map[0, :, :] + normalized_flow_map[1, :, :]
-    )
-    rgb_map[2, :, :] += normalized_flow_map[1, :, :]
-    return rgb_map.clip(0, 1)
-
-
-def grid2rgb(grid_map, max_value):
-    h, w, _ = grid_map.shape
-    grid_map[(grid_map[:, :, 0] == 0) & (grid_map[:, :, 1] == 0), :] = float("nan")
-    rgb_map = np.ones((3, h, w)).astype(np.float32)
-    if max_value is not None:
-        normalized_flow_map = grid_map / max_value
-    else:
-        normalized_flow_map = grid_map / (np.abs(grid_map).max())
-    rgb_map[0, :, :] += normalized_flow_map[:, :, 0]
-    rgb_map[1, :, :] -= 0.5 * (
-        normalized_flow_map[:, :, 0] + normalized_flow_map[:, :, 1]
-    )
-    rgb_map[2, :, :] += normalized_flow_map[:, :, 1]
     return rgb_map.clip(0, 1)
 
 
@@ -127,21 +118,6 @@ def get_n_params(model):
     return pp
 
 
-def get_mea(output_right, label_right, mean=(0.411, 0.432, 0.45)):
-    # B, C, H, W = output_right.shape
-    mean_shift = torch.zeros(output_right.shape).cuda()
-    mean_shift[:, 0, :, :] = mean[0]
-    mean_shift[:, 1, :, :] = mean[1]
-    mean_shift[:, 2, :, :] = mean[2]
-
-    output_right = (output_right + mean_shift) * 255
-    output_right[output_right > 255] = 255
-    output_right[output_right < 0] = 0
-    label_right = (label_right + mean_shift) * 255
-    mea = torch.mean(torch.abs(output_right - label_right))
-    return mea
-
-
 def get_rmse(output_right, label_right, mean=(0.411, 0.432, 0.45)):
     # B, C, H, W = output_right.shape
     mean_shift = torch.zeros(output_right.shape).cuda()
@@ -155,28 +131,6 @@ def get_rmse(output_right, label_right, mean=(0.411, 0.432, 0.45)):
     label_right = (label_right + mean_shift) * 255
     rmse = (torch.mean((output_right - label_right) ** 2)) ** (1 / 2)
     return rmse
-
-
-def get_psnr(output_right, label_right, mean=(0.411, 0.432, 0.45)):
-    # B, C, H, W = output_right.shape
-    mean_shift = torch.zeros(output_right.shape).cuda()
-    mean_shift[:, 0, :, :] = mean[0]
-    mean_shift[:, 1, :, :] = mean[1]
-    mean_shift[:, 2, :, :] = mean[2]
-
-    output_right = (output_right + mean_shift) * 255
-    output_right[output_right > 255] = 255
-    output_right[output_right < 0] = 0
-    output_right = output_right.round()
-    label_right = (label_right + mean_shift) * 255
-
-    N = output_right.size()[0]
-    imdiff = output_right - label_right
-    imdiff = imdiff.view(N, -1)
-    rmse = torch.sqrt(torch.mean(imdiff ** 2))
-    psnrs = 20 * torch.log10(255 / rmse)
-    psnr = torch.mean(psnrs)
-    return psnr
 
 
 kitti_error_names = ["abs_rel", "sq_rel", "rms", "log_rms", "a1", "a2", "a3"]
@@ -287,63 +241,6 @@ def disps_to_depths_kitti(gt_disparities, pred_disparities):
         pred_depths.append(pred_depth)
 
     return gt_depths, pred_depths
-
-
-def disps_to_depths_make(gt_disparities, pred_disparities, min_d=1.0, max_d=70.0):
-    gt_depths = []
-    pred_depths = []
-
-    for i in range(len(gt_disparities)):
-        gt_disp = gt_disparities[i]
-        pred_disp = pred_disparities[i]
-        gt_mask = (gt_disp > 0) * (gt_disp < max_d)
-        pred_mask = pred_disp > 0
-        gt_depth = gt_disp
-
-        # approx depth
-        pred_depth = 721 * 0.22 / (pred_disp + (1.0 - pred_mask))
-
-        gt_depth = gt_depth[gt_mask]
-        pred_depth = pred_depth[gt_mask]
-
-        # Median scaling
-        factor = np.median(gt_depth) / np.median(pred_depth)
-        pred_depth = factor * pred_depth
-
-        pred_depth[pred_depth > max_d] = max_d
-        pred_depth[pred_depth < min_d] = min_d
-        gt_depth[gt_depth > max_d] = max_d
-        gt_depth[gt_depth < min_d] = min_d
-
-        gt_depths.append(gt_depth)
-        pred_depths.append(pred_depth)
-
-    return gt_depths, pred_depths
-
-
-def compute_make_errors(gt, pred):
-    mask = gt > 0
-    gt = gt[mask]
-    pred = pred[mask]
-
-    thresh = np.maximum((gt / pred), (pred / gt))
-    a1 = (thresh < 1.25).mean()
-    a2 = (thresh < 1.25 ** 2).mean()
-    a3 = (thresh < 1.25 ** 3).mean()
-
-    rmse = (gt - pred) ** 2
-    rmse = np.sqrt(rmse.mean())
-
-    log10 = np.abs(np.log10(gt) - np.log10(pred))
-    log10 = log10.mean()
-
-    abs_rel = np.mean(np.abs(gt - pred) / gt)
-
-    sq_rel = np.mean(((gt - pred) ** 2) / gt)
-
-    errors = [abs_rel, sq_rel, rmse, log10, a1, a2, a3]
-
-    return errors
 
 
 # Obtain point cloud from estimated disparity

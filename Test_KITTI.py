@@ -16,6 +16,8 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import os
+
 import argparse
 import time
 import numpy as np
@@ -121,30 +123,7 @@ parser.add_argument(
 )
 
 
-def display_config(save_path):
-    settings = ""
-    settings = (
-        settings + "############################################################\n"
-    )
-    settings = (
-        settings + "# FAL-net        -         Pytorch implementation          #\n"
-    )
-    settings = (
-        settings + "# by Juan Luis Gonzalez   juanluisgb@kaist.ac.kr           #\n"
-    )
-    settings = (
-        settings + "############################################################\n"
-    )
-    settings = settings + "-------YOUR TRAINING SETTINGS---------\n"
-    for arg in vars(args):
-        settings = settings + "%15s: %s\n" % (str(arg), str(getattr(args, arg)))
-    print(settings)
-    # Save config in txt file
-    with open(os.path.join(save_path, "settings.txt"), "w+") as f:
-        f.write(settings)
-
-
-def main(device="cpu"):
+def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
 
     save_path = os.path.join(
@@ -158,7 +137,7 @@ def main(device="cpu"):
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    display_config(save_path)
+    utils.display_config(args, save_path)
 
     input_transform = transforms.Compose(
         [
@@ -171,7 +150,10 @@ def main(device="cpu"):
     )
 
     target_transform = transforms.Compose(
-        [data_transforms.ArrayToTensor(), transforms.Normalize(mean=[0], std=[1]),]
+        [
+            data_transforms.ArrayToTensor(),
+            transforms.Normalize(mean=[0], std=[1]),
+        ]
     )
 
     # Torch Data Set List
@@ -217,11 +199,10 @@ def main(device="cpu"):
 
     print("len(val_loader)", len(val_loader))
     # evaluate on validation set
-    validate(val_loader, pan_model, save_path, model_parameters)
+    validate(args, val_loader, pan_model, save_path, model_parameters, device)
 
 
-def validate(val_loader, pan_model, save_path, model_param):
-    global args
+def validate(args, val_loader, pan_model, save_path, model_param, device):
     batch_time = utils.AverageMeter()
     EPEs = utils.AverageMeter()
     kitti_erros = utils.multiAverageMeter(utils.kitti_error_names)
@@ -486,50 +467,11 @@ def local_normalization(img, win=3):
         (img - win_mean_T) ** 2, kernel_size=win, stride=1, padding=(win - 1) // 2
     ) ** (1 / 2)
     win_norm_img = (img - win_mean_T) / (win_std + 0.0000001)
-    # win_norm_img = win_std
-
-    # padded_img = F.pad(img.clone(), [(win-1)//2, (win-1)//2, (win-1)//2, (win-1)//2], mode='reflect')
-    # for i in range(win):
-    #     for j in range(win):
-    #         if i == 0 and j == 0:
-    #             img_ngb = padded_img[:,:,i:H + i, j:W + j].unsqueeze(1)
-    #         else:
-    #             img_ngb = torch.cat((img_ngb, padded_img[:, :, i:H + i, j:W + j].unsqueeze(1)), 1) # B,win**2,C,H,W
-    #
-    # # Reshape for matrix multiplications
-    # img_ngb = img_ngb.view((B, win**2, C, H * W))
-    # img_ngb = torch.transpose(torch.transpose(img_ngb, 1, 3), 2, 3)
-    # img_ngb = img_ngb.view((B * H * W, win**2, C))
-    #
-    # win_mean = win_mean_T.clone().view((B, C, H * W))
-    # win_mean = torch.transpose(win_mean, 1, 2)
-    # win_mean = win_mean.view((B * H * W, C)).unsqueeze(2)
-    #
-    # # Get inverse variance matrix
-    # # win_var=inv(winI'*winI/neb_size-win_mu*win_mu' +epsilon/neb_size*eye(c));
-    # eye = torch.eye(win).type(img_ngb.type())
-    # eye = eye.reshape((1, win, win))
-    # eye = eye.repeat(B, 1, 1)
-    # eps = 0.000001 / (win**2)
-    # win_var_inv = torch.inverse(img_ngb.transpose(1,2).bmm(img_ngb) / (win**2) - win_mean.bmm(win_mean.transpose(1,2))
-    #                         + eps * eye) #3x3 matrices
-    #
-    # # Remove the mean and multiply by variance
-    # win_norm_img = win_norm_img.view((B, C, H * W))
-    # win_norm_img = torch.transpose(win_norm_img, 1, 2)
-    # win_norm_img = win_norm_img.view((B * H * W, C)).unsqueeze(1)
-    # win_norm_img = win_norm_img.bmm(win_var_inv).squeeze(1) # B*H*W, C, 1
-    #
-    # # Reshape in B,C,H,W format
-    # win_norm_img = win_norm_img.view((B, H * W, C)).transpose(1, 2)
-    # win_norm_img = win_norm_img.view((B, C, H, W))
 
     return win_norm_img
 
 
 if __name__ == "__main__":
-    import os
-
     args = parser.parse_args()
 
     device = torch.device("cuda" if args.gpu_no else "cpu")
