@@ -32,7 +32,7 @@ from tensorboardX import SummaryWriter
 # Usefull tensorboard call
 # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
 
-import myUtils as utils
+import utils.myUtils as utils
 import data_transforms
 from loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
 
@@ -235,7 +235,10 @@ def main(device="cpu"):
     )
 
     target_transform = transforms.Compose(
-        [data_transforms.ArrayToTensor(), transforms.Normalize(mean=[0], std=[1]),]
+        [
+            data_transforms.ArrayToTensor(),
+            transforms.Normalize(mean=[0], std=[1]),
+        ]
     )
 
     # Torch Data Set List

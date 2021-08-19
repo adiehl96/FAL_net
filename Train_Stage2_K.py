@@ -33,7 +33,7 @@ import torch.nn.functional as F
 # Usefull tensorboard call
 # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
 
-import myUtils as utils
+import utils.myUtils as utils
 import data_transforms
 from loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
 
