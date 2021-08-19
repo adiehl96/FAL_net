@@ -411,11 +411,13 @@ def train(train_loader, m_model, g_optimizer, epoch):
                     left_view[:, :, :, int(0.20 * W) : :],
                     ldisp[:, :, :, int(0.20 * W) : :],
                     gamma=2,
+                    device=device,
                 )
                 + smoothness(
                     right_view[:, :, :, 0 : int(0.80 * W)],
                     rdisp[:, :, :, 0 : int(0.80 * W)],
                     gamma=2,
+                    device=device,
                 )
             ) / 2
 

@@ -539,6 +539,4 @@ if __name__ == "__main__":
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(item) for item in args.gpu_no])
 
-    args = parser.parse_args()
-
     main(device)

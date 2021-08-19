@@ -25,7 +25,6 @@ import csv
 
 def Kitti_eigen_test_improved(split, **kwargs):
     input_root = kwargs.pop("root")
-    print("input_root", input_root)
     transform = kwargs.pop("transform", None)
     target_transform = kwargs.pop("target_transform", None)
     shuffle_test = kwargs.pop("shuffle_test", False)
