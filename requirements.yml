@@ -1,4 +1,4 @@
-name: falnet2
+name: falnet
 channels:
   - defaults
 dependencies:
