@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 import models
-from utils.dataloader import load_data
+from misc.dataloader import load_data
 
 import torch
 import torch.utils.data
@@ -35,9 +35,9 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 
-import utils.myUtils as utils
-import data_transforms
-from loss_functions import realEPE
+from misc import utils
+import misc.data_transforms
+from misc.loss_functions import realEPE
 
 
 model_names = sorted(name for name in models.__all__)

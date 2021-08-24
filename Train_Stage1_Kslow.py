@@ -563,7 +563,7 @@ if __name__ == "__main__":
     # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
 
     import myUtils as utils
-    import data_transforms
-    from loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
+    import utils.data_transforms
+    from misc.loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
 
     main()

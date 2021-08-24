@@ -16,9 +16,9 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 
-import utils.myUtils as utils
-import data_transforms
-from loss_functions import realEPE
+from misc import utils
+from misc import data_transforms
+from misc.loss_functions import realEPE
 from Test_KITTI import main as test
 from Train_Stage1_K import main as train1
 from Train_Stage2_K import main as train2

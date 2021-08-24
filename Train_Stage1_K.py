@@ -23,7 +23,7 @@ import datetime
 import time
 import numpy as np
 
-from utils.dataloader import load_data
+from misc.dataloader import load_data
 import models
 
 import torch
@@ -34,9 +34,9 @@ from tensorboardX import SummaryWriter
 # Usefull tensorboard call
 # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
 
-import utils.myUtils as utils
-import data_transforms
-from loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
+from misc import utils
+from misc import data_transforms
+from misc.loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
 
 parser = argparse.ArgumentParser(
     description="FAL_net in pytorch",

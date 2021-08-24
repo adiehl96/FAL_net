@@ -1,9 +1,9 @@
 import os.path
-from utils.listdataset_test import ListDataset as TestListDataset
-from utils.listdataset_train import ListDataset as TrainListDataset
+from misc.listdataset_test import ListDataset as TestListDataset
+from misc.listdataset_train import ListDataset as TrainListDataset
 from random import shuffle
 import csv
-from utils.myUtils import flatten
+from misc.utils import flatten
 
 
 def load_data(split, **kwargs):
