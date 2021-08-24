@@ -7,7 +7,6 @@ from imageio import imsave
 import matplotlib.pyplot as plt
 from PIL import Image
 
-import Datasets
 import models
 
 import torch
@@ -22,15 +21,11 @@ import data_transforms
 from loss_functions import realEPE
 from Test_KITTI import main as test
 from Train_Stage1_K import main as train1
-
-
-def train2(args, device):
-    pass
+from Train_Stage2_K import main as train2
 
 
 def main():
 
-    dataset_names = sorted(name for name in Datasets.__all__)
     model_names = sorted(name for name in models.__all__)
 
     parser = argparse.ArgumentParser(
@@ -50,7 +45,6 @@ def main():
         "--dataName0",
         metavar="Data Set Name 0",
         default="KITTI",
-        choices=dataset_names,
     )
 
     parser.add_argument(
@@ -58,7 +52,6 @@ def main():
         "--tdataName",
         metavar="Test Data Set Name",
         default="Kitti_eigen_test_improved",
-        choices=dataset_names,
     )
 
     parser.add_argument(
@@ -66,7 +59,6 @@ def main():
         "--vdataName",
         metavar="Val data set Name",
         default="KITTI2015",
-        choices=dataset_names,
     )
 
     parser.add_argument(

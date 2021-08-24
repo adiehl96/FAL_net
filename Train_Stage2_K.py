@@ -16,6 +16,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
+import os
 import argparse
 import datetime
 import time
@@ -36,7 +37,6 @@ import torch.nn.functional as F
 import utils.myUtils as utils
 import data_transforms
 from loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
-
 
 def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
@@ -187,11 +187,11 @@ def main(args, device="cpu"):
 
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
-        train_loss = train(train_loader0, m_model, fix_model, g_optimizer, epoch)
+        train_loss = train(args, train_loader0, m_model, fix_model, g_optimizer, epoch, device)
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
         # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-        rmse = validate(val_loader, m_model, epoch, output_writers)
+        rmse = validate(args, val_loader, m_model, epoch, output_writers, device)
         test_writer.add_scalar("mean RMSE", rmse, epoch)
 
         # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
@@ -213,8 +213,7 @@ def main(args, device="cpu"):
         )
 
 
-def train(train_loader, m_model, fix_model, g_optimizer, epoch):
-    global args
+def train(args, train_loader, m_model, fix_model, g_optimizer, epoch, device):
     epoch_size = (
         len(train_loader)
         if args.epoch_size == 0
@@ -386,8 +385,7 @@ def train(train_loader, m_model, fix_model, g_optimizer, epoch):
     return losses.avg
 
 
-def validate(val_loader, m_model, epoch, output_writers):
-    global args
+def validate(args, val_loader, m_model, epoch, output_writers, device):
 
     test_time = utils.AverageMeter()
     RMSES = utils.AverageMeter()
