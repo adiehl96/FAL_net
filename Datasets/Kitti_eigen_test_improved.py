@@ -35,7 +35,7 @@ def Kitti_eigen_test_improved(split, **kwargs):
         for row in eigen_test_improved_reader:
             inputleft = (
                 input_root
-                + "/raw/"
+                + "/"
                 + row[0].split("/")[1]
                 + "/image_02/data/"
                 + row[1].zfill(10)
@@ -43,7 +43,7 @@ def Kitti_eigen_test_improved(split, **kwargs):
             )
             inputright = (
                 input_root
-                + "/raw/"
+                + "/"
                 + row[0].split("/")[1]
                 + "/image_03/data/"
                 + row[1].zfill(10)
@@ -51,7 +51,7 @@ def Kitti_eigen_test_improved(split, **kwargs):
             )
             groundtruthleft = (
                 input_root
-                + "/raw/"
+                + "/"
                 + row[0].split("/")[1]
                 + "/proj_depth/groundtruth/image_02/"
                 + row[1].zfill(10)
@@ -59,7 +59,7 @@ def Kitti_eigen_test_improved(split, **kwargs):
             )
             velodyneleft = (
                 input_root
-                + "/raw/"
+                + "/"
                 + row[0].split("/")[1]
                 + "/proj_depth/velodyne_raw/image_02/"
                 + row[1].zfill(10)
@@ -75,6 +75,15 @@ def Kitti_eigen_test_improved(split, **kwargs):
                 eigen_test_improved_list.append(
                     [[inputleft, inputright], [groundtruthleft, velodyneleft]]
                 )
+            else:
+                print(f"Path to input left exists: {os.path.isfile(inputleft)}")
+                print(inputleft)
+                print(f"Path to input right exists: {os.path.isfile(inputright)}")
+                print(inputright)
+                print(f"Path to groundtruthleft exists: {os.path.isfile(groundtruthleft)}")
+                print(groundtruthleft)
+                print(f"Path to velodyneleft exists: {os.path.isfile(velodyneleft)}")
+                print(velodyneleft)
 
         test_list = eigen_test_improved_list
         if len(test_list) != 652:

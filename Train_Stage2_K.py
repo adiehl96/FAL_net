@@ -154,12 +154,12 @@ parser.add_argument(
 parser.add_argument(
     "--fix_model",
     dest="fix_model",
-    default="KITTI_stage1/03-25-15_29/FAL_netB,e50es,b4,lr0.0001/checkpoint.pth.tar",
+    default="KITTI_stage1/08-20-13_25/FAL_netB,e50es,b1,lr0.0001/checkpoint.pth.tar",
 )
 parser.add_argument(
     "--pretrained",
     dest="pretrained",
-    default="KITTI_stage1/03-25-15_29/FAL_netB,e50es,b4,lr0.0001/checkpoint.pth.tar",
+    default="KITTI_stage1/08-20-13_25/FAL_netB,e50es,b1,lr0.0001/checkpoint.pth.tar",
     help="directory of run",
 )
 

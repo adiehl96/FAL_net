@@ -42,7 +42,7 @@ def Kitti(split, **kwargs):
             for row in eigen_train_reader:
                 inputleft = (
                     input_root
-                    + "/raw/"
+                    + "/"
                     + row[0].split("/")[1]
                     + "/image_02/data/"
                     + row[1].zfill(10)
@@ -50,7 +50,7 @@ def Kitti(split, **kwargs):
                 )
                 inputright = (
                     input_root
-                    + "/raw/"
+                    + "/"
                     + row[0].split("/")[1]
                     + "/image_03/data/"
                     + row[1].zfill(10)

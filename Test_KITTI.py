@@ -265,9 +265,9 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
             # Get disp
             if args.save_pan:
                 pan_im, disp, maskL, maskRL, dispr = pan_model(
-                    input_left,
-                    min_disp,
-                    max_disp,
+                    input_left=input_left,
+                    min_disp=min_disp,
+                    max_disp=max_disp,
                     ret_disp=True,
                     ret_subocc=True,
                     ret_pan=True,
@@ -277,9 +277,9 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                 feats = [local_normalization(input_left), dispr / 100, maskL, maskRL]
             else:
                 disp = pan_model(
-                    input_left,
-                    min_disp,
-                    max_disp,
+                    input_left=input_left,
+                    min_disp=min_disp,
+                    max_disp=max_disp,
                     ret_disp=True,
                     ret_subocc=False,
                     ret_pan=False,
@@ -288,9 +288,9 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
 
             if args.f_post_process:
                 flip_disp = pan_model(
-                    F.grid_sample(input_left, flip_grid, align_corners=False),
-                    min_disp,
-                    max_disp,
+                    input_left=F.grid_sample(input_left, flip_grid, align_corners=False),
+                    min_disp=min_disp,
+                    max_disp=max_disp,
                     ret_disp=True,
                     ret_pan=False,
                     ret_subocc=False,
@@ -435,7 +435,7 @@ def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):
         recompute_scale_factor=True,
     )
     dwn_flip_disp = pan_model(
-        upscaled, min_disp, max_pix, ret_disp=True, ret_pan=False, ret_subocc=False
+        input_left=upscaled, min_disp=min_disp, max_disp=max_pix, ret_disp=True, ret_pan=False, ret_subocc=False
     )
     dwn_flip_disp = (1 / up_fac) * F.interpolate(
         dwn_flip_disp, size=(H, W), mode="nearest"
@@ -478,4 +478,4 @@ if __name__ == "__main__":
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(item) for item in args.gpu_no])
 
-    main(device)
+    main(args, device)

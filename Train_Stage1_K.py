@@ -1,3 +1,5 @@
+#!/home/arne/conda/miniconda/envs/falnet/bin/python
+
 # Train_Stage1_K.py Train model on KITTI only
 # Copyright (C) 2021  Juan Luis Gonzalez Bello (juanluisgb@kaist.ac.kr)
 # This software is not for commercial use
@@ -379,9 +381,7 @@ def train(train_loader, m_model, g_optimizer, epoch, device):
 
         ###### LEFT disp
         min_disp = max_disp * args.min_disp / args.max_disp
-        rpan, ldisp = m_model(
-            left_view, min_disp, max_disp, ret_disp=True, ret_pan=True, ret_subocc=False
-        )
+        rpan, ldisp = m_model(input_left=left_view, min_disp=min_disp, max_disp=max_disp, ret_disp=True, ret_pan=True, ret_subocc=False)
         # Compute rec loss
         if args.a_p > 0:
             vgg_right = vgg(right_view)
@@ -458,9 +458,9 @@ def validate(val_loader, m_model, epoch, output_writers):
             end = time.time()
             min_disp = max_disp * args.min_disp / args.max_disp
             p_im, disp, maskL, maskRL = m_model(
-                input_left,
-                min_disp,
-                max_disp,
+                input_left=input_left,
+                min_disp=min_disp,
+                max_disp=max_disp,
                 ret_disp=True,
                 ret_pan=True,
                 ret_subocc=True,
@@ -537,6 +537,7 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if args.gpu_no else "cpu")
 
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(item) for item in args.gpu_no])
 
     main(device)
