@@ -27,15 +27,6 @@ from PIL import Image
 LR_DATASETS = ["Kitti_eigen_test_improved"]
 
 
-def Make3Ddisp_loader(input_root, path_img):
-    disp = os.path.join(input_root, path_img)
-    disp = sio.loadmat(disp, verify_compressed_data_integrity=False)
-    disp = disp["Position3DGrid"][:, :, 3]
-    disp = Image.fromarray(disp).resize((1704, 2272), resample=Image.NEAREST)
-    disp = np.array(disp)
-    return disp[:, :, np.newaxis]
-
-
 def img_loader(input_root, path_img):
     imgs = os.path.join(input_root, path_img)
     return imread(imgs)
@@ -83,10 +74,6 @@ class ListDataset(data.Dataset):
             self.input_loader = img_loader
             if self.disp:
                 self.target_loader = kittidepth_loader
-        elif data_name == "Make3D":
-            self.input_loader = img_loader
-            if self.disp:
-                self.target_loader = Make3Ddisp_loader
 
     def __len__(self):
         return len(self.path_list)

@@ -24,6 +24,7 @@ import time
 import numpy as np
 
 import Datasets
+from utils.dataloader import load_data
 import models
 
 import torch
@@ -245,14 +246,14 @@ def main(device="cpu"):
 
     # Torch Data Set List
     input_path = os.path.join(args.data, args.dataName0)
-    [train_dataset0, _] = Datasets.__dict__[args.dataName0](
+    train_dataset0 = load_data(
         split=1,  # all for training
+        dataset=args.dataName0,
         root=input_path,
         transform=input_transform,
         target_transform=target_transform,
         co_transform=co_transform,
         max_pix=args.max_disp,
-        train_split=args.train_split,
         fix=True,
     )
     input_path = os.path.join(args.data, args.vdataName)

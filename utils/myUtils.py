@@ -7,6 +7,18 @@ import shutil
 import numpy as np
 
 
+def flatten(the_lists):
+    result = []
+    for item in the_lists:
+        if isinstance(item, list):
+            result += item
+        else:
+            result.append(item)
+    if any(isinstance(x, list) for x in result):
+        result = flatten(result)
+    return result
+
+
 def display_config(args, save_path):
     settings = ""
     settings = (

@@ -97,12 +97,7 @@ class ListDataset(data.Dataset):
                 self.input_loader(self.input_root, inputs, Lt_index),
             ]
 
-        # x_pix = np.random.uniform(low=0, high=self.max)
         y_pix = np.random.uniform(low=-self.max, high=self.max)
-
-        # file_name = os.path.basename(inputs[Lt_index])[:-4]
-        # inputs = [self.input_loader(self.input_root, inputs, Lt_index),
-        #           self.input_loader(self.input_root, inputs, Rt_indexlr)]
 
         if self.reference_transform is not None:
             inputs[0] = self.reference_transform(inputs[0])

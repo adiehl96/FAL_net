@@ -25,8 +25,8 @@ from imageio import imsave
 import matplotlib.pyplot as plt
 from PIL import Image
 
-import Datasets
 import models
+from utils.dataloader import load_data
 
 import torch
 import torch.utils.data
@@ -40,7 +40,6 @@ import data_transforms
 from loss_functions import realEPE
 
 
-dataset_names = sorted(name for name in Datasets.__all__)
 model_names = sorted(name for name in models.__all__)
 
 
@@ -79,8 +78,9 @@ def main(args, device="cpu"):
 
     # Torch Data Set List
     input_path = os.path.join(args.data, args.tdataName)
-    [test_dataset, _] = Datasets.__dict__[args.tdataName](
+    test_dataset = load_data(
         split=1,  # all to be tested
+        dataset=args.tdataName,
         root=args.data,
         disp=True,
         shuffle_test=False,
