@@ -62,7 +62,7 @@ def Kitti(split, **kwargs):
             train_list = eigen_train_list
             if len(train_list) != 45200:
                 raise Exception(
-                    f"Could only load {len(train_list)} images from \"KITTI eigen test improved split\" of size 45200."
+                    f'Could only load {len(train_list)} images from "KITTI eigen test improved split" of size 45200.'
                 )
 
     train_dataset = panListDataset(

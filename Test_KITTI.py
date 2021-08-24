@@ -43,85 +43,6 @@ from loss_functions import realEPE
 dataset_names = sorted(name for name in Datasets.__all__)
 model_names = sorted(name for name in models.__all__)
 
-parser = argparse.ArgumentParser(
-    description="Testing pan generation",
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-)
-parser.add_argument(
-    "-d",
-    "--data",
-    metavar="DIR",
-    default="C:\\Users\\Kaist\\Desktop",
-    help="path to dataset",
-)
-parser.add_argument(
-    "-tn",
-    "--tdataName",
-    metavar="Test Data Set Name",
-    default="Kitti_eigen_test_improved",
-    choices=dataset_names,
-)
-parser.add_argument(
-    "-relbase", "--rel_baselne", default=1, help="Relative baseline of testing dataset"
-)
-parser.add_argument("-mdisp", "--max_disp", default=300)  # of the training patch W
-parser.add_argument("-mindisp", "--min_disp", default=2)  # of the training patch W
-parser.add_argument("-b", "--batch_size", metavar="Batch Size", default=1)
-parser.add_argument("-eval", "--evaluate", default=True)
-parser.add_argument("-save", "--save", default=False)
-parser.add_argument("-save_pc", "--save_pc", default=False)
-parser.add_argument("-save_pan", "--save_pan", default=False)
-parser.add_argument("-save_input", "--save_input", default=False)
-parser.add_argument("-w", "--workers", metavar="Workers", default=4, type=int)
-parser.add_argument(
-    "--sparse",
-    default=False,
-    action="store_true",
-    help="Depth GT is sparse, automatically seleted when choosing a KITTIdataset",
-)
-parser.add_argument(
-    "--print-freq", "-p", default=10, type=int, metavar="N", help="print frequency"
-)
-parser.add_argument(
-    "-gpu_no",
-    "--gpu_no",
-    default=[],
-    type=int,
-    nargs="+",
-    help="Number of available GPUs, use None to train on CPU",
-)
-parser.add_argument(
-    "-dt",
-    "--dataset",
-    help="Dataset and training stage directory",
-    default="Kitti_stage2",
-)
-parser.add_argument(
-    "-ts", "--time_stamp", help="Model timestamp", default="10-18-15_42"
-)
-parser.add_argument("-m", "--model", help="Model", default="FAL_netB")
-parser.add_argument(
-    "-no_levels", "--no_levels", default=49, help="Number of quantization levels in MED"
-)
-parser.add_argument(
-    "-dtl", "--details", help="details", default=",e20es,b4,lr5e-05/checkpoint.pth.tar"
-)
-parser.add_argument(
-    "-fpp", "--f_post_process", default=False, help="Post-processing with flipped input"
-)
-parser.add_argument(
-    "-mspp",
-    "--ms_post_process",
-    default=True,
-    help="Post-processing with multi-scale input",
-)
-parser.add_argument(
-    "-median",
-    "--median",
-    default=False,
-    help="use median scaling (not needed when training from stereo",
-)
-
 
 def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
@@ -288,7 +209,9 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
 
             if args.f_post_process:
                 flip_disp = pan_model(
-                    input_left=F.grid_sample(input_left, flip_grid, align_corners=False),
+                    input_left=F.grid_sample(
+                        input_left, flip_grid, align_corners=False
+                    ),
                     min_disp=min_disp,
                     max_disp=max_disp,
                     ret_disp=True,
@@ -435,7 +358,12 @@ def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):
         recompute_scale_factor=True,
     )
     dwn_flip_disp = pan_model(
-        input_left=upscaled, min_disp=min_disp, max_disp=max_pix, ret_disp=True, ret_pan=False, ret_subocc=False
+        input_left=upscaled,
+        min_disp=min_disp,
+        max_disp=max_pix,
+        ret_disp=True,
+        ret_pan=False,
+        ret_subocc=False,
     )
     dwn_flip_disp = (1 / up_fac) * F.interpolate(
         dwn_flip_disp, size=(H, W), mode="nearest"
@@ -469,13 +397,3 @@ def local_normalization(img, win=3):
     win_norm_img = (img - win_mean_T) / (win_std + 0.0000001)
 
     return win_norm_img
-
-
-if __name__ == "__main__":
-    args = parser.parse_args()
-
-    device = torch.device("cuda" if args.gpu_no else "cpu")
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(item) for item in args.gpu_no])
-
-    main(args, device)

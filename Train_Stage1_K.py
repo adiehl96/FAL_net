@@ -381,7 +381,14 @@ def train(train_loader, m_model, g_optimizer, epoch, device):
 
         ###### LEFT disp
         min_disp = max_disp * args.min_disp / args.max_disp
-        rpan, ldisp = m_model(input_left=left_view, min_disp=min_disp, max_disp=max_disp, ret_disp=True, ret_pan=True, ret_subocc=False)
+        rpan, ldisp = m_model(
+            input_left=left_view,
+            min_disp=min_disp,
+            max_disp=max_disp,
+            ret_disp=True,
+            ret_pan=True,
+            ret_subocc=False,
+        )
         # Compute rec loss
         if args.a_p > 0:
             vgg_right = vgg(right_view)

@@ -80,7 +80,9 @@ def Kitti_eigen_test_improved(split, **kwargs):
                 print(inputleft)
                 print(f"Path to input right exists: {os.path.isfile(inputright)}")
                 print(inputright)
-                print(f"Path to groundtruthleft exists: {os.path.isfile(groundtruthleft)}")
+                print(
+                    f"Path to groundtruthleft exists: {os.path.isfile(groundtruthleft)}"
+                )
                 print(groundtruthleft)
                 print(f"Path to velodyneleft exists: {os.path.isfile(velodyneleft)}")
                 print(velodyneleft)
