@@ -34,14 +34,14 @@ def main():
     model_names = sorted(name for name in models.__all__)
 
     parser = argparse.ArgumentParser(
-        description="Testing pan generation",
+        description="FAL_net in pytorch",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "-d",
         "--data",
         metavar="DIR",
-        default="C:\\Users\\Kaist\\Desktop",
+        default="/dataQ/arne",
         help="path to dataset",
     )
 
@@ -92,6 +92,7 @@ def main():
     parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=640)
     parser.add_argument("-save", "--save", default=False)
     parser.add_argument("--lr", metavar="learning Rate", default=0.0001)
+    # todo for train2 the default learning rate is 0.00005
     parser.add_argument("-save_pc", "--save_pc", default=False)
     parser.add_argument("-save_pan", "--save_pan", default=False)
     parser.add_argument(
@@ -109,7 +110,7 @@ def main():
     parser.add_argument("-w", "--workers", metavar="Workers", default=4, type=int)
     parser.add_argument(
         "--sparse",
-        default=False,
+        default=True,
         action="store_true",
         help="Depth GT is sparse, automatically seleted when choosing a KITTIdataset",
     )
@@ -133,7 +134,8 @@ def main():
     )
     parser.add_argument(
         "-smooth", "--a_sm", default=0.2 * 2 / 512, help="Smoothness loss weight"
-    )
+    )  # todo: the smoothness loss weight of train2 was 0.4*2/512 but I don't know why
+    parser.add_argument("-mirror_loss", "--a_mr", default=1, help="Mirror loss weight")
 
     parser.add_argument("-perc", "--a_p", default=0.01, help="Perceptual loss weight")
 
@@ -191,6 +193,7 @@ def main():
         nargs="*",
         help="epochs at which learning rate is divided by 2",
     )
+    # todo: the default for train2 is [5, 10],
     parser.add_argument(
         "--weight-decay",
         "--wd",
@@ -207,6 +210,7 @@ def main():
         metavar="N",
         help="number of total epochs to run",
     )
+    # todo default for train stage 2 is 20
     parser.add_argument(
         "--epoch_size",
         default=0,
@@ -224,11 +228,24 @@ def main():
     )
 
     parser.add_argument(
+        "--fix_model",
+        dest="fix_model",
+        default="KITTI_stage1/08-20-13_25/FAL_netB,e50es,b1,lr0.0001/checkpoint.pth.tar",
+    )
+
+    parser.add_argument(
         "--pretrained",
         dest="pretrained",
         default=None,
         help="path to pre-trained model",
     )
+    # todo train2
+    #     parser.add_argument(
+    #     "--pretrained",
+    #     dest="pretrained",
+    #     default="KITTI_stage1/08-20-13_25/FAL_netB,e50es,b1,lr0.0001/checkpoint.pth.tar",
+    #     help="directory of run",
+    # )
 
     parser.add_argument(
         "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"

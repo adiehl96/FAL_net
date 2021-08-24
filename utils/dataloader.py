@@ -1,6 +1,6 @@
 import os.path
-from Datasets.listdataset_test import ListDataset as TestListDataset
-from Datasets.listdataset_train import ListDataset as TrainListDataset
+from utils.listdataset_test import ListDataset as TestListDataset
+from utils.listdataset_train import ListDataset as TrainListDataset
 from random import shuffle
 import csv
 from utils.myUtils import flatten
@@ -20,11 +20,11 @@ def load_data(split, **kwargs):
     disp_arg = kwargs.pop("disp", False)
 
     if dataset == "Kitti_eigen_test_improved":
-        splitfilelocation = "./Datasets/split/eigen_test_improved.txt"
+        splitfilelocation = "./datasets/KITTI/eigen_test_improved.txt"
     elif dataset == "KITTI":
-        splitfilelocation = "./Datasets/split/eigen_train.txt"
+        splitfilelocation = "./datasets/KITTI/eigen_train.txt"
     elif dataset == "KITTI2015":
-        splitfilelocation = "./Datasets/KITTI2015/bello_val.txt"
+        splitfilelocation = "./datasets/KITTI2015/bello_val.txt"
 
     try:
         datasetfile = open(splitfilelocation)

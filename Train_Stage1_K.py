@@ -23,7 +23,6 @@ import datetime
 import time
 import numpy as np
 
-import Datasets
 from utils.dataloader import load_data
 import models
 
@@ -38,10 +37,6 @@ from tensorboardX import SummaryWriter
 import utils.myUtils as utils
 import data_transforms
 from loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
-
-
-dataset_names = sorted(name for name in Datasets.__all__)
-model_names = sorted(name for name in models.__all__)
 
 parser = argparse.ArgumentParser(
     description="FAL_net in pytorch",
