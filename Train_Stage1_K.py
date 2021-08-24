@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
+import os
 import argparse
 import datetime
 import time
@@ -47,147 +47,9 @@ parser = argparse.ArgumentParser(
     description="FAL_net in pytorch",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument(
-    "-d",
-    "--data",
-    metavar="DIR",
-    default="C:\\Users\\Kaist\\Desktop",
-    help="path to dataset",
-)
-parser.add_argument(
-    "-n0",
-    "--dataName0",
-    metavar="Data Set Name 0",
-    default="KITTI",
-    choices=dataset_names,
-)
-parser.add_argument("-train_split", "--train_split", default="eigen_train_split")
-parser.add_argument(
-    "-vdn",
-    "--vdataName",
-    metavar="Val data set Name",
-    default="KITTI2015",
-    choices=dataset_names,
-)
-parser.add_argument(
-    "-relbase_test",
-    "--rel_baset",
-    default=1,
-    help="Relative baseline of testing dataset",
-)
-parser.add_argument("-maxd", "--max_disp", default=300)
-parser.add_argument("-mind", "--min_disp", default=2)
-# -----------------------------------------------------------------------------
-parser.add_argument(
-    "-gpu_no",
-    "--gpu_no",
-    default=[],
-    type=int,
-    nargs="+",
-    help="Name the indices of the GPUs you want to train on. Defaults to CPU.",
-)
-parser.add_argument(
-    "-mm", "--m_model", metavar="Mono Model", default="FAL_netB", choices=model_names
-)
-parser.add_argument(
-    "-no_levels", "--no_levels", default=49, help="Number of quantization levels in MED"
-)
-parser.add_argument("-perc", "--a_p", default=0.01, help="Perceptual loss weight")
-parser.add_argument(
-    "-smooth", "--a_sm", default=0.2 * 2 / 512, help="Smoothness loss weight"
-)
-# ------------------------------------------------------------------------------
-parser.add_argument("-w", "--workers", metavar="Workers", default=4, type=int)
-parser.add_argument("-b", "--batch_size", metavar="Batch Size", default=8, type=int)
-parser.add_argument("-ch", "--crop_height", metavar="Batch crop H Size", default=192)
-parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=640)
-parser.add_argument("-tbs", "--tbatch_size", metavar="Val Batch Size", default=1)
-parser.add_argument("-op", "--optimizer", metavar="Optimizer", default="adam")
-parser.add_argument("--lr", metavar="learning Rate", default=0.0001)
-parser.add_argument(
-    "--beta", metavar="BETA", type=float, help="Beta parameter for adam", default=0.999
-)
-parser.add_argument(
-    "--momentum",
-    default=0.5,
-    type=float,
-    metavar="Momentum",
-    help="Momentum for Optimizer",
-)
-parser.add_argument(
-    "--milestones",
-    default=[30, 40],
-    metavar="N",
-    nargs="*",
-    help="epochs at which learning rate is divided by 2",
-)
-parser.add_argument(
-    "--weight-decay", "--wd", default=0.0, type=float, metavar="W", help="weight decay"
-)
-parser.add_argument(
-    "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"
-)
-parser.add_argument(
-    "--epochs", default=50, type=int, metavar="N", help="number of total epochs to run"
-)
-parser.add_argument(
-    "--epoch_size",
-    default=0,
-    type=int,
-    metavar="N",
-    help="manual epoch size (will match dataset size if set to 0)",
-)
-parser.add_argument(
-    "--sparse",
-    default=True,
-    action="store_true",
-    help="Depth GT is sparse, automatically seleted when choosing a KITTIdataset",
-)
-parser.add_argument(
-    "--print-freq", "-p", default=100, type=int, metavar="N", help="print frequency"
-)
-parser.add_argument(
-    "--start-epoch",
-    default=0,
-    type=int,
-    metavar="N",
-    help="manual epoch number (useful on restarts)",
-)
-parser.add_argument(
-    "--pretrained", dest="pretrained", default=None, help="path to pre-trained model"
-)
-# parser.add_argument(
-#    "--pretrained",
-#    dest="pretrained",
-#    default="Kitti_stage1\\10-15-10_16\\FAL_netB,e50es,b8,lr0.0001\\checkpoint.pth.tar",
-#    help="directory of run",
-# )
 
 
-def display_config(save_path):
-    settings = ""
-    settings = (
-        settings + "############################################################\n"
-    )
-    settings = (
-        settings + "# FAL_net - Pytorch implementation                         #\n"
-    )
-    settings = (
-        settings + "# by Juan Luis Gonzalez   juanluisgb@kaist.ac.kr           #\n"
-    )
-    settings = (
-        settings + "############################################################\n"
-    )
-    settings = settings + "-------YOUR TRAINING SETTINGS---------\n"
-    for arg in vars(args):
-        settings = settings + "%15s: %s\n" % (str(arg), str(getattr(args, arg)))
-    print(settings)
-    # Save config in txt file
-    with open(os.path.join(save_path, "settings.txt"), "w+") as f:
-        f.write(settings)
-
-
-def main(device="cpu"):
+def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
     best_rmse = -1
 
@@ -204,7 +66,7 @@ def main(device="cpu"):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    display_config(save_path)
+    utils.display_config(args, save_path)
     print("=> will save everything to {}".format(save_path))
 
     # Set output writters for showing up progress on tensorboardX
@@ -257,8 +119,9 @@ def main(device="cpu"):
         fix=True,
     )
     input_path = os.path.join(args.data, args.vdataName)
-    [_, test_dataset] = Datasets.__dict__[args.vdataName](
+    test_dataset = load_data(
         split=0,  # all to be tested
+        dataset=args.vdataName,
         root=input_path,
         disp=True,
         of=False,
@@ -324,11 +187,11 @@ def main(device="cpu"):
 
     for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
-        train_loss = train(train_loader0, m_model, g_optimizer, epoch, device)
+        train_loss = train(args, train_loader0, m_model, g_optimizer, epoch, device)
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
         # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-        rmse = validate(val_loader, m_model, epoch, output_writers)
+        rmse = validate(args, val_loader, m_model, epoch, output_writers)
         test_writer.add_scalar("mean RMSE", rmse, epoch)
 
         # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
@@ -350,8 +213,7 @@ def main(device="cpu"):
         )
 
 
-def train(train_loader, m_model, g_optimizer, epoch, device):
-    global args
+def train(args, train_loader, m_model, g_optimizer, epoch, device):
     epoch_size = (
         len(train_loader)
         if args.epoch_size == 0
@@ -437,8 +299,7 @@ def train(train_loader, m_model, g_optimizer, epoch, device):
     return losses.avg
 
 
-def validate(val_loader, m_model, epoch, output_writers):
-    global args
+def validate(args, val_loader, m_model, epoch, output_writers):
 
     test_time = utils.AverageMeter()
     RMSES = utils.AverageMeter()
@@ -536,16 +397,3 @@ def validate(val_loader, m_model, epoch, output_writers):
     print(" * EPE {:.3f}".format(EPEs.avg))
     print(kitti_erros)
     return RMSES.avg
-
-
-if __name__ == "__main__":
-    import os
-
-    args = parser.parse_args()
-
-    device = torch.device("cuda" if args.gpu_no else "cpu")
-
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join([str(item) for item in args.gpu_no])
-
-    main(device)

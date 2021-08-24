@@ -90,6 +90,13 @@ def Kitti2015(split, **kwargs):
         train_list = make_dataset(input_root, split, scene_flow=False, training=True)[0]
         test_list = make_dataset(input_root, split, scene_flow=False, training=False)[0]
 
+    with open("your_file.txt", "w") as f:
+        for item in test_list:
+            print(item)
+            f.write(
+                f"{item[0][0]},{item[0][1]},{item[0][2]},{item[0][3]},{item[1][0]},{item[1][1]}\n"
+            )
+
     train_dataset = ListDataset(
         input_root,
         input_root,

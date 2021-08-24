@@ -20,15 +20,8 @@ import torch.nn.functional as F
 import utils.myUtils as utils
 import data_transforms
 from loss_functions import realEPE
-from Test_KITTI import main as test_main
-
-
-def test(args, device):
-    test_main(args, device)
-
-
-def train1(args, device):
-    pass
+from Test_KITTI import main as test
+from Train_Stage1_K import main as train1
 
 
 def train2(args, device):
@@ -51,6 +44,15 @@ def main():
         default="C:\\Users\\Kaist\\Desktop",
         help="path to dataset",
     )
+
+    parser.add_argument(
+        "-n0",
+        "--dataName0",
+        metavar="Data Set Name 0",
+        default="KITTI",
+        choices=dataset_names,
+    )
+
     parser.add_argument(
         "-tn",
         "--tdataName",
@@ -58,19 +60,51 @@ def main():
         default="Kitti_eigen_test_improved",
         choices=dataset_names,
     )
+
     parser.add_argument(
-        "-relbase",
-        "--rel_baselne",
+        "-vdn",
+        "--vdataName",
+        metavar="Val data set Name",
+        default="KITTI2015",
+        choices=dataset_names,
+    )
+
+    parser.add_argument(
+        "-relbase_test",
+        "--rel_baset",
         default=1,
         help="Relative baseline of testing dataset",
     )
+
     parser.add_argument("-mdisp", "--max_disp", default=300)  # of the training patch W
     parser.add_argument("-mindisp", "--min_disp", default=2)  # of the training patch W
-    parser.add_argument("-b", "--batch_size", metavar="Batch Size", default=1)
+    parser.add_argument("-b", "--batch_size", metavar="Batch Size", default=1, type=int)
     parser.add_argument("-eval", "--evaluate", default=True)
+    parser.add_argument("-tbs", "--tbatch_size", metavar="Val Batch Size", default=1)
+    parser.add_argument("-op", "--optimizer", metavar="Optimizer", default="adam")
+    parser.add_argument(
+        "--beta",
+        metavar="BETA",
+        type=float,
+        help="Beta parameter for adam",
+        default=0.999,
+    )
+    parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=640)
     parser.add_argument("-save", "--save", default=False)
+    parser.add_argument("--lr", metavar="learning Rate", default=0.0001)
     parser.add_argument("-save_pc", "--save_pc", default=False)
     parser.add_argument("-save_pan", "--save_pan", default=False)
+    parser.add_argument(
+        "--momentum",
+        default=0.5,
+        type=float,
+        metavar="Momentum",
+        help="Momentum for Optimizer",
+    )
+
+    parser.add_argument(
+        "-ch", "--crop_height", metavar="Batch crop H Size", default=192
+    )
     parser.add_argument("-save_input", "--save_input", default=False)
     parser.add_argument("-w", "--workers", metavar="Workers", default=4, type=int)
     parser.add_argument(
@@ -90,6 +124,19 @@ def main():
         nargs="+",
         help="GPU indices to train on. Trains on CPU if none are supplied.",
     )
+    parser.add_argument(
+        "-mm",
+        "--m_model",
+        metavar="Mono Model",
+        default="FAL_netB",
+        choices=model_names,
+    )
+    parser.add_argument(
+        "-smooth", "--a_sm", default=0.2 * 2 / 512, help="Smoothness loss weight"
+    )
+
+    parser.add_argument("-perc", "--a_p", default=0.01, help="Perceptual loss weight")
+
     parser.add_argument(
         "-dt",
         "--dataset",
@@ -136,6 +183,55 @@ def main():
         default="test",
         help="Select the modus operandi.",
         choices=["test", "train1", "train2"],
+    )
+    parser.add_argument(
+        "--milestones",
+        default=[30, 40],
+        metavar="N",
+        nargs="*",
+        help="epochs at which learning rate is divided by 2",
+    )
+    parser.add_argument(
+        "--weight-decay",
+        "--wd",
+        default=0.0,
+        type=float,
+        metavar="W",
+        help="weight decay",
+    )
+
+    parser.add_argument(
+        "--epochs",
+        default=50,
+        type=int,
+        metavar="N",
+        help="number of total epochs to run",
+    )
+    parser.add_argument(
+        "--epoch_size",
+        default=0,
+        type=int,
+        metavar="N",
+        help="manual epoch size (will match dataset size if set to 0)",
+    )
+
+    parser.add_argument(
+        "--start-epoch",
+        default=0,
+        type=int,
+        metavar="N",
+        help="manual epoch number (useful on restarts)",
+    )
+
+    parser.add_argument(
+        "--pretrained",
+        dest="pretrained",
+        default=None,
+        help="path to pre-trained model",
+    )
+
+    parser.add_argument(
+        "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"
     )
 
     args = parser.parse_args()

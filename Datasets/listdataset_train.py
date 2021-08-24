@@ -55,7 +55,6 @@ class ListDataset(data.Dataset):
         path_list,
         disp=False,
         of=False,
-        data_name="Monkaa",
         transform=None,
         target_transform=None,
         co_transform=None,
@@ -72,7 +71,6 @@ class ListDataset(data.Dataset):
         self.co_transform = co_transform
         self.disp = disp
         self.of = of
-        self.data_name = data_name
         self.input_loader = img_loader
         self.max = max_pix
         self.fix_order = fix

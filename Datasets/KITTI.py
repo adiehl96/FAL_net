@@ -63,9 +63,7 @@ def Kitti(split, **kwargs):
 
             with open("your_file.txt", "w") as f:
                 for item in train_list:
-                    f.write(
-                        f"{item[0][0][17:]},{item[0][1][17:]}\n"
-                    )
+                    f.write(f"{item[0][0][17:]},{item[0][1][17:]}\n")
             if len(train_list) != 45200:
                 raise Exception(
                     f'Could only load {len(train_list)} images from "KITTI eigen test improved split" of size 45200.'

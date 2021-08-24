@@ -16,12 +16,15 @@ def load_data(split, **kwargs):
     co_transform = kwargs.pop("co_transform", None)
     max_pix = kwargs.pop("max_pix", 100)
     fix = kwargs.pop("fix", False)
-
+    of_arg = kwargs.pop("of", False)
+    disp_arg = kwargs.pop("disp", False)
 
     if dataset == "Kitti_eigen_test_improved":
         splitfilelocation = "./Datasets/split/eigen_test_improved.txt"
     elif dataset == "KITTI":
         splitfilelocation = "./Datasets/split/eigen_train.txt"
+    elif dataset == "KITTI2015":
+        splitfilelocation = "./Datasets/KITTI2015/bello_val.txt"
 
     try:
         datasetfile = open(splitfilelocation)
@@ -37,10 +40,23 @@ def load_data(split, **kwargs):
             groundtruthleft = f"{input_root}/{row[2]}"
             velodyneleft = f"{input_root}/{row[3]}"
             files = [[inputleft, inputright], [groundtruthleft, velodyneleft]]
+
         elif dataset == "KITTI":
             inputleft = f"{input_root}/{row[0]}"
             inputright = f"{input_root}/{row[1]}"
             files = [[inputleft, inputright], None]
+
+        elif dataset == "KITTI2015":
+            inputleft_t0 = f"{input_root}/{row[0]}"
+            inputright_t0 = f"{input_root}/{row[1]}"
+            inputleft_t1 = f"{input_root}/{row[2]}"
+            inputright_t1 = f"{input_root}/{row[3]}"
+            disp = f"{input_root}/{row[4]}"
+            of = f"{input_root}/{row[5]}"
+            files = [
+                [inputleft_t0, inputright_t0, inputleft_t1, inputright_t1],
+                [disp, of],
+            ]
 
         if all(map(lambda x: True if x == None else os.path.isfile(x), flatten(files))):
             datasetlist.append(files)
@@ -68,7 +84,6 @@ def load_data(split, **kwargs):
             input_root,
             input_root,
             datasetlist,
-            data_name="Kitti2015",
             disp=False,
             of=False,
             transform=transform,
@@ -78,6 +93,16 @@ def load_data(split, **kwargs):
             reference_transform=reference_transform,
             fix=fix,
         )
-
+    elif dataset == "KITTI2015":
+        dataset = TestListDataset(
+            input_root,
+            input_root,
+            datasetlist,
+            data_name="Kitti2015",
+            disp=disp_arg,
+            of=of_arg,
+            transform=transform,
+            target_transform=target_transform,
+        )
 
     return dataset
