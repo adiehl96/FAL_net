@@ -18,7 +18,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import os
-import argparse
 import datetime
 import time
 import numpy as np
@@ -36,11 +35,6 @@ from tensorboardX import SummaryWriter
 
 from misc import utils, data_transforms
 from misc.loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
-
-parser = argparse.ArgumentParser(
-    description="FAL_net in pytorch",
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-)
 
 
 def main(args, device="cpu"):
@@ -228,7 +222,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device):
         left_view = input_data0[0][0].cuda()
         right_view = input_data0[0][1].cuda()
         max_disp = input_data0[1].unsqueeze(1).unsqueeze(1).type(left_view.type())
-        B, C, H, W = left_view.shape
+        _, _, _, W = left_view.shape
 
         # measure data loading time
         data_time.update(time.time() - end)
@@ -315,7 +309,6 @@ def validate(args, val_loader, model, epoch, output_writers):
                 .unsqueeze(1)
                 .type(input_left.type())
             )
-            B, _, H, W = input_left.shape
 
             # Prepare input data
             end = time.time()

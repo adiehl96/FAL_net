@@ -409,7 +409,6 @@ def validate(args, val_loader, model, epoch, output_writers, device):
                 .unsqueeze(1)
                 .type(input_left.type())
             )
-            B, _, H, W = input_left.shape
 
             # Prepare input data
             end = time.time()

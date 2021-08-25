@@ -18,7 +18,6 @@
 
 import os
 
-import argparse
 import time
 import numpy as np
 from imageio import imsave
@@ -150,11 +149,10 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
 
     with torch.no_grad():
         print("with torch.no_grad():")
-        for i, (input, target, f_name) in enumerate(val_loader):
+        for i, (input, target, _) in enumerate(val_loader):
             print("for i, (input, target, f_name) in enumerate(val_loader):", i)
             target = target[0].to(device)
             input_left = input[0].to(device)
-            input_right = input[1].to(device)
             B, C, H, W = input_left.shape
 
             # Prepare flip grid for post-processing
@@ -273,7 +271,6 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                     for layer in range(len(feats)):
                         _, nc, _, _ = feats[layer].shape
                         for inc in range(nc):
-                            mean = torch.abs(feats[layer][:, inc, :, :]).mean()
                             feature = (
                                 255
                                 * torch.abs(feats[layer][:, inc, :, :])
@@ -341,7 +338,7 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
 
 
 def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):
-    B, C, H, W = input_view.shape
+    _, _, H, W = input_view.shape
 
     up_fac = 2 / 3
     upscaled = F.interpolate(
@@ -371,7 +368,7 @@ def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):
 
 
 def local_normalization(img, win=3):
-    B, C, H, W = img.shape
+    B, C, _, _ = img.shape
     mean = [0.411, 0.432, 0.45]
     m_rgb = torch.ones((B, C, 1, 1)).type(img.type())
     m_rgb[:, 0, :, :] = mean[0] * m_rgb[:, 0, :, :]

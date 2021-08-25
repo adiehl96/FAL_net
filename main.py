@@ -1,6 +1,5 @@
 import os
 import argparse
-import models
 import torch
 
 from Test_KITTI import main as test
@@ -9,8 +8,6 @@ from Train_Stage2_K import main as train2
 
 
 def main():
-
-    model_names = sorted(name for name in models.__all__)
 
     parser = argparse.ArgumentParser(
         description="FAL_net in pytorch",
@@ -211,7 +208,6 @@ def main():
         metavar="N",
         help="number of total epochs to run in train stage 2",
     )
-    # todo default for train stage 2 is 20
     parser.add_argument(
         "--epoch_size",
         default=0,
@@ -240,13 +236,6 @@ def main():
         default=None,
         help="path to pre-trained model",
     )
-    # todo train2
-    #     parser.add_argument(
-    #     "--pretrained",
-    #     dest="pretrained",
-    #     default="KITTI_stage1/08-20-13_25/FAL_netB,e50es,b1,lr0.0001/checkpoint.pth.tar",
-    #     help="directory of run",
-    # )
 
     parser.add_argument(
         "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"
@@ -259,6 +248,8 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join(
         [str(item) for item in args.gpu_indices]
     )
+
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
     if args.modus_operandi == "test":
         test(args, device)
