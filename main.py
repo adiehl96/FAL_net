@@ -1,10 +1,4 @@
-import os
 import argparse
-import torch
-
-from Test_KITTI import main as test
-from Train_Stage1_K import main as train1
-from Train_Stage2_K import main as train2
 
 
 def main():
@@ -241,15 +235,22 @@ def main():
         "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"
     )
 
-    args = parser.parse_args()
+    import os
 
-    device = torch.device("cuda" if args.gpu_indices else "cpu")
+    args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join(
         [str(item) for item in args.gpu_indices]
     )
-
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+
+    import torch
+
+    from Test_KITTI import main as test
+    from Train_Stage1_K import main as train1
+    from Train_Stage2_K import main as train2
+
+    device = torch.device("cuda" if args.gpu_indices else "cpu")
 
     if args.modus_operandi == "test":
         test(args, device)

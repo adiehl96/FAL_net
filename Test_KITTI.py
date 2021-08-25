@@ -100,8 +100,11 @@ def main(args, device="cpu"):
     model_dir = os.path.join("KITTI_stage2", args.time_stamp, args.model + args.details)
     print(model_dir)
     pan_network_data = torch.load(model_dir, map_location=torch.device(device))
-    # print(pan_network_data)
-    pan_model = pan_network_data["model"]
+
+    pan_model = pan_network_data[
+        next(item for item in pan_network_data.keys() if "model" in str(item))
+    ]
+
     print("=> using pre-trained model for pan '{}'".format(pan_model))
     pan_model = models.__dict__[pan_model](
         pan_network_data, no_levels=args.no_levels, device=device
@@ -150,7 +153,7 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
     with torch.no_grad():
         print("with torch.no_grad():")
         for i, (input, target, _) in enumerate(val_loader):
-            print("for i, (input, target, f_name) in enumerate(val_loader):", i)
+            # print("for i, (input, target, f_name) in enumerate(val_loader):", i)
             target = target[0].to(device)
             input_left = input[0].to(device)
             B, C, H, W = input_left.shape

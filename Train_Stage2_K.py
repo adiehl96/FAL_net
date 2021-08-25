@@ -142,7 +142,9 @@ def main(args, device="cpu"):
     # create model
     if args.pretrained:
         network_data = torch.load(args.pretrained)
-        args.model = network_data["model"]
+        args.model = network_data[
+            next(item for item in network_data.keys() if "model" in str(item))
+        ]
         print("=> using pre-trained model '{}'".format(args.model))
     else:
         network_data = None
@@ -156,7 +158,9 @@ def main(args, device="cpu"):
 
     # create fix model
     network_data = torch.load(args.fix_model)
-    fix_model_name = network_data["model"]
+    fix_model_name = network_data[
+        next(item for item in network_data.keys() if "model" in str(item))
+    ]
     print("=> using pre-trained model '{}'".format(fix_model_name))
     fix_model = models.__dict__[fix_model_name](
         network_data, no_levels=args.no_levels
