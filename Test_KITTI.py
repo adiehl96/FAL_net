@@ -35,8 +35,7 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 
-from misc import utils
-import misc.data_transforms
+from misc import utils, data_transforms
 from misc.loss_functions import realEPE
 
 
@@ -46,9 +45,7 @@ model_names = sorted(name for name in models.__all__)
 def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
 
-    save_path = os.path.join(
-        "Test_Results", args.tdataName, args.model, args.time_stamp
-    )
+    save_path = os.path.join("Test_Results", args.dataset, args.model, args.time_stamp)
     if args.f_post_process:
         save_path = save_path + "fpp"
     if args.ms_post_process:
@@ -77,11 +74,11 @@ def main(args, device="cpu"):
     )
 
     # Torch Data Set List
-    input_path = os.path.join(args.data, args.tdataName)
+    input_path = os.path.join(args.data_directory, args.dataset)
     test_dataset = load_data(
-        split=1,  # all to be tested
-        dataset=args.tdataName,
-        root=args.data,
+        split=args.test_split,
+        dataset=args.dataset,
+        root=input_path,
         disp=True,
         shuffle_test=False,
         transform=input_transform,
@@ -101,11 +98,11 @@ def main(args, device="cpu"):
     )
 
     # create pan model
-    model_dir = os.path.join(args.dataset, args.time_stamp, args.model + args.details)
+    model_dir = os.path.join("KITTI_stage2", args.time_stamp, args.model + args.details)
     print(model_dir)
     pan_network_data = torch.load(model_dir, map_location=torch.device(device))
     # print(pan_network_data)
-    pan_model = pan_network_data["m_model"]
+    pan_model = pan_network_data["model"]
     print("=> using pre-trained model for pan '{}'".format(pan_model))
     pan_model = models.__dict__[pan_model](
         pan_network_data, no_levels=args.no_levels, device=device
@@ -149,7 +146,7 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
         os.makedirs(feats_path)
 
     # Set the max disp
-    right_shift = args.max_disp * args.rel_baselne
+    right_shift = args.max_disp * args.rel_baset
 
     with torch.no_grad():
         print("with torch.no_grad():")
@@ -158,10 +155,6 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
             target = target[0].to(device)
             input_left = input[0].to(device)
             input_right = input[1].to(device)
-            if args.tdataName == "Owndata":
-                B, C, H, W = input_left.shape
-                input_left = input_left[:, :, 0 : int(0.95 * H), :]
-                # input_left = F.interpolate(input_left, scale_factor=1.0, mode='bilinear', align_corners=True)
             B, C, H, W = input_left.shape
 
             # Prepare flip grid for post-processing
@@ -303,8 +296,9 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                 target_disp = target.squeeze(1).cpu().numpy()
                 pred_disp = disp.squeeze(1).cpu().numpy()
                 if (
-                    args.tdataName == "Kitti_eigen_test_improved"
-                    or args.tdataName == "Kitti_eigen_test_original"
+                    args.dataset == "Kitti_eigen_test_improved"
+                    or args.dataset == "Kitti_eigen_test_original"
+                    or args.dataset == "KITTI"
                 ):
                     target_depth, pred_depth = utils.disps_to_depths_kitti(
                         target_disp, pred_disp
@@ -315,7 +309,7 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                         ),
                         target.size(0),
                     )
-                if args.tdataName == "Kitti2015":
+                if args.dataset == "Kitti2015":
                     EPE = realEPE(disp, target, sparse=True)
                     EPEs.update(EPE.detach(), target.size(0))
                     target_depth, pred_depth = utils.disps_to_depths_kitti2015(

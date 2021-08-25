@@ -34,8 +34,7 @@ from tensorboardX import SummaryWriter
 # Usefull tensorboard call
 # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
 
-from misc import utils
-from misc import data_transforms
+from misc import utils, data_transforms
 from misc.loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
 
 parser = argparse.ArgumentParser(
@@ -49,15 +48,15 @@ def main(args, device="cpu"):
     best_rmse = -1
 
     save_path = "{},e{}es{},b{},lr{}".format(
-        args.m_model,
-        args.epochs,
+        args.model,
+        args.epochs1,
         str(args.epoch_size) if args.epoch_size > 0 else "",
         args.batch_size,
-        args.lr,
+        args.lr1,
     )
     timestamp = datetime.datetime.now().strftime("%m-%d-%H_%M")
     save_path = os.path.join(timestamp, save_path)
-    save_path = os.path.join(args.dataName0 + "_stage1", save_path)
+    save_path = os.path.join(args.dataset + "_stage1", save_path)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
@@ -102,10 +101,10 @@ def main(args, device="cpu"):
     )
 
     # Torch Data Set List
-    input_path = os.path.join(args.data, args.dataName0)
+    input_path = os.path.join(args.data_directory, args.dataset)
     train_dataset0 = load_data(
-        split=1,  # all for training
-        dataset=args.dataName0,
+        split=args.train_split,
+        dataset=args.dataset,
         root=input_path,
         transform=input_transform,
         target_transform=target_transform,
@@ -113,10 +112,10 @@ def main(args, device="cpu"):
         max_pix=args.max_disp,
         fix=True,
     )
-    input_path = os.path.join(args.data, args.vdataName)
+    input_path = os.path.join(args.data_directory, args.validation_dataset)
     test_dataset = load_data(
-        split=0,  # all to be tested
-        dataset=args.vdataName,
+        split=args.validation_split,
+        dataset=args.validation_dataset,
         root=input_path,
         disp=True,
         of=False,
@@ -148,45 +147,45 @@ def main(args, device="cpu"):
     # create model
     if args.pretrained:
         network_data = torch.load(args.pretrained)
-        args.m_model = network_data["m_model"]
-        print("=> using pre-trained model '{}'".format(args.m_model))
+        args.model = network_data["model"]
+        print("=> using pre-trained model '{}'".format(args.model))
     else:
         network_data = None
-        print("=> creating m model '{}'".format(args.m_model))
+        print("=> creating m model '{}'".format(args.model))
 
-    m_model = models.__dict__[args.m_model](
+    model = models.__dict__[args.model](
         network_data, no_levels=args.no_levels, device=device
     ).cuda()
-    m_model = torch.nn.DataParallel(m_model).cuda()
-    print("=> Number of parameters m-model '{}'".format(utils.get_n_params(m_model)))
+    model = torch.nn.DataParallel(model).cuda()
+    print("=> Number of parameters model '{}'".format(utils.get_n_params(model)))
 
     # Optimizer Settings
     print("Setting {} Optimizer".format(args.optimizer))
     param_groups = [
-        {"params": m_model.module.bias_parameters(), "weight_decay": args.bias_decay},
+        {"params": model.module.bias_parameters(), "weight_decay": args.bias_decay},
         {
-            "params": m_model.module.weight_parameters(),
+            "params": model.module.weight_parameters(),
             "weight_decay": args.weight_decay,
         },
     ]
     if args.optimizer == "adam":
         g_optimizer = torch.optim.Adam(
-            params=param_groups, lr=args.lr, betas=(args.momentum, args.beta)
+            params=param_groups, lr=args.lr1, betas=(args.momentum, args.beta)
         )
     g_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        g_optimizer, milestones=args.milestones, gamma=0.5
+        g_optimizer, milestones=args.milestones1, gamma=0.5
     )
 
     for epoch in range(args.start_epoch):
         g_scheduler.step()
 
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(args.start_epoch, args.epochs1):
         # train for one epoch
-        train_loss = train(args, train_loader0, m_model, g_optimizer, epoch, device)
+        train_loss = train(args, train_loader0, model, g_optimizer, epoch, device)
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
         # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-        rmse = validate(args, val_loader, m_model, epoch, output_writers)
+        rmse = validate(args, val_loader, model, epoch, output_writers)
         test_writer.add_scalar("mean RMSE", rmse, epoch)
 
         # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
@@ -199,8 +198,8 @@ def main(args, device="cpu"):
         utils.save_checkpoint(
             {
                 "epoch": epoch + 1,
-                "m_model": args.m_model,
-                "state_dict": m_model.module.state_dict(),
+                "model": args.model,
+                "state_dict": model.module.state_dict(),
                 "best_rmse": best_rmse,
             },
             is_best,
@@ -208,7 +207,7 @@ def main(args, device="cpu"):
         )
 
 
-def train(args, train_loader, m_model, g_optimizer, epoch, device):
+def train(args, train_loader, model, g_optimizer, epoch, device):
     epoch_size = (
         len(train_loader)
         if args.epoch_size == 0
@@ -221,7 +220,7 @@ def train(args, train_loader, m_model, g_optimizer, epoch, device):
     losses = utils.AverageMeter()
 
     # switch to train mode
-    m_model.train()
+    model.train()
 
     end = time.time()
     for i, input_data0 in enumerate(train_loader):
@@ -239,7 +238,7 @@ def train(args, train_loader, m_model, g_optimizer, epoch, device):
 
         ###### LEFT disp
         min_disp = max_disp * args.min_disp / args.max_disp
-        rpan, ldisp = m_model(
+        rpan, ldisp = model(
             input_left=left_view,
             min_disp=min_disp,
             max_disp=max_disp,
@@ -260,7 +259,7 @@ def train(args, train_loader, m_model, g_optimizer, epoch, device):
 
         #  Compute smooth loss
         sm_loss = 0
-        if args.a_sm > 0:
+        if args.smooth1 > 0:
             # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
             sm_loss = smoothness(
                 left_view[:, :, :, int(0.20 * W) : :],
@@ -270,7 +269,7 @@ def train(args, train_loader, m_model, g_optimizer, epoch, device):
             )
 
         # compute gradient and do optimization step
-        loss = rec_loss + args.a_sm * sm_loss
+        loss = rec_loss + args.smooth1 * sm_loss
         losses.update(loss.detach().cpu(), args.batch_size)
         loss.backward()
         g_optimizer.step()
@@ -294,7 +293,7 @@ def train(args, train_loader, m_model, g_optimizer, epoch, device):
     return losses.avg
 
 
-def validate(args, val_loader, m_model, epoch, output_writers):
+def validate(args, val_loader, model, epoch, output_writers):
 
     test_time = utils.AverageMeter()
     RMSES = utils.AverageMeter()
@@ -302,7 +301,7 @@ def validate(args, val_loader, m_model, epoch, output_writers):
     kitti_erros = utils.multiAverageMeter(utils.kitti_error_names)
 
     # switch to evaluate mode
-    m_model.eval()
+    model.eval()
 
     # Disable gradients to save memory
     with torch.no_grad():
@@ -321,7 +320,7 @@ def validate(args, val_loader, m_model, epoch, output_writers):
             # Prepare input data
             end = time.time()
             min_disp = max_disp * args.min_disp / args.max_disp
-            p_im, disp, maskL, maskRL = m_model(
+            p_im, disp, maskL, maskRL = model(
                 input_left=input_left,
                 min_disp=min_disp,
                 max_disp=max_disp,

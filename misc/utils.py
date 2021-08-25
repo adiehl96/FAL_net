@@ -14,7 +14,7 @@ def flatten(the_lists):
             result += item
         else:
             result.append(item)
-    if any(isinstance(x, list) for x in result):
+    if any(isinstance(item, list) for item in result):
         result = flatten(result)
     return result
 

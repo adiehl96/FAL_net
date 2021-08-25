@@ -1,24 +1,8 @@
 import os
-
 import argparse
-import time
-import numpy as np
-from imageio import imsave
-import matplotlib.pyplot as plt
-from PIL import Image
-
 import models
-
 import torch
-import torch.utils.data
-import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torchvision.transforms as transforms
-import torch.nn.functional as F
 
-from misc import utils
-from misc import data_transforms
-from misc.loss_functions import realEPE
 from Test_KITTI import main as test
 from Train_Stage1_K import main as train1
 from Train_Stage2_K import main as train2
@@ -33,32 +17,46 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "-d",
-        "--data",
+        "-dd",
+        "--data_directory",
         metavar="DIR",
         default="/dataQ/arne",
-        help="path to dataset",
+        help="Directory containing the datasets",
     )
 
     parser.add_argument(
-        "-n0",
-        "--dataName0",
-        metavar="Data Set Name 0",
+        "-d",
+        "--dataset",
+        metavar="Name of the Dataset to be used.",
         default="KITTI",
     )
 
     parser.add_argument(
-        "-tn",
-        "--tdataName",
-        metavar="Test Data Set Name",
-        default="Kitti_eigen_test_improved",
+        "-vds",
+        "--validation_dataset",
+        metavar="Validation dataset Name",
+        default="KITTI2015",
     )
 
     parser.add_argument(
-        "-vdn",
-        "--vdataName",
-        metavar="Val data set Name",
-        default="KITTI2015",
+        "-tesp",
+        "--test_split",
+        metavar="Name of the test split of the data to be loaded from the dataset.",
+        default="eigen_test_improved",
+    )
+
+    parser.add_argument(
+        "-vasp",
+        "--validation_split",
+        metavar="Name of the validation split of the data to be loaded from the dataset.",
+        default="bello_val",
+    )
+
+    parser.add_argument(
+        "-trsp",
+        "--train_split",
+        metavar="Name of the train split of the data to be loaded from the dataset.",
+        default="eigen_train",
     )
 
     parser.add_argument(
@@ -83,8 +81,10 @@ def main():
     )
     parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=640)
     parser.add_argument("-save", "--save", default=False)
-    parser.add_argument("--lr", metavar="learning Rate", default=0.0001)
-    # todo for train2 the default learning rate is 0.00005
+    parser.add_argument("--lr1", metavar="Initial Learning Rate Train1", default=0.0001)
+    parser.add_argument(
+        "--lr2", metavar="Initial Learning Rate Train2", default=0.00005
+    )
     parser.add_argument("-save_pc", "--save_pc", default=False)
     parser.add_argument("-save_pan", "--save_pan", default=False)
     parser.add_argument(
@@ -118,27 +118,23 @@ def main():
         help="GPU indices to train on. Trains on CPU if none are supplied.",
     )
     parser.add_argument(
-        "-mm",
-        "--m_model",
-        metavar="Mono Model",
-        default="FAL_netB",
-        choices=model_names,
+        "-sm1",
+        "--smooth1",
+        default=0.2 * 2 / 512,
+        help="Smoothness loss weightfor training stage 1",
     )
     parser.add_argument(
-        "-smooth", "--a_sm", default=0.2 * 2 / 512, help="Smoothness loss weight"
-    )  # todo: the smoothness loss weight of train2 was 0.4*2/512 but I don't know why
+        "-sm2",
+        "--smooth2",
+        default=0.4 * 2 / 512,
+        help="Smoothness loss weight for training stage 2",
+    )
     parser.add_argument("-mirror_loss", "--a_mr", default=1, help="Mirror loss weight")
 
     parser.add_argument("-perc", "--a_p", default=0.01, help="Perceptual loss weight")
 
     parser.add_argument(
-        "-dt",
-        "--dataset",
-        help="Dataset and training stage directory",
-        default="Kitti_stage2",
-    )
-    parser.add_argument(
-        "-ts", "--time_stamp", help="Model timestamp", default="10-18-15_42"
+        "-ts", "--time_stamp", help="Model timestamp", default="03-29-14_18"
     )
     parser.add_argument("-m", "--model", help="Model", default="FAL_netB")
     parser.add_argument(
@@ -179,13 +175,19 @@ def main():
         choices=["test", "train1", "train2"],
     )
     parser.add_argument(
-        "--milestones",
+        "--milestones1",
         default=[30, 40],
         metavar="N",
         nargs="*",
-        help="epochs at which learning rate is divided by 2",
+        help="epochs at which learning rate is divided by 2 in training stage 1",
     )
-    # todo: the default for train2 is [5, 10],
+    parser.add_argument(
+        "--milestones2",
+        default=[5, 10],
+        metavar="N",
+        nargs="*",
+        help="epochs at which learning rate is divided by 2 in training stage 2",
+    )
     parser.add_argument(
         "--weight-decay",
         "--wd",
@@ -196,11 +198,18 @@ def main():
     )
 
     parser.add_argument(
-        "--epochs",
+        "--epochs1",
         default=50,
         type=int,
         metavar="N",
-        help="number of total epochs to run",
+        help="number of total epochs to run in train stage 1",
+    )
+    parser.add_argument(
+        "--epochs2",
+        default=20,
+        type=int,
+        metavar="N",
+        help="number of total epochs to run in train stage 2",
     )
     # todo default for train stage 2 is 20
     parser.add_argument(

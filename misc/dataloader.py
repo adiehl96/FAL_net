@@ -19,11 +19,11 @@ def load_data(split, **kwargs):
     of_arg = kwargs.pop("of", False)
     disp_arg = kwargs.pop("disp", False)
 
-    if dataset == "Kitti_eigen_test_improved":
+    if split == "eigen_test_improved" and dataset == "KITTI":
         splitfilelocation = "./datasets/KITTI/eigen_test_improved.txt"
-    elif dataset == "KITTI":
+    elif split == "eigen_train" and dataset == "KITTI":
         splitfilelocation = "./datasets/KITTI/eigen_train.txt"
-    elif dataset == "KITTI2015":
+    elif split == "bello_val" and dataset == "KITTI2015":
         splitfilelocation = "./datasets/KITTI2015/bello_val.txt"
 
     try:
@@ -34,19 +34,19 @@ def load_data(split, **kwargs):
     datasetreader = csv.reader(datasetfile, delimiter=",")
     datasetlist = []
     for row in datasetreader:
-        if dataset == "Kitti_eigen_test_improved":
-            inputleft = f"{input_root}/{row[0]}"
-            inputright = f"{input_root}/{row[1]}"
-            groundtruthleft = f"{input_root}/{row[2]}"
-            velodyneleft = f"{input_root}/{row[3]}"
+        if split == "eigen_test_improved" and dataset == "KITTI":
+            inputleft = f"{input_root}{row[0]}"
+            inputright = f"{input_root}{row[1]}"
+            groundtruthleft = f"{input_root}{row[2]}"
+            velodyneleft = f"{input_root}{row[3]}"
             files = [[inputleft, inputright], [groundtruthleft, velodyneleft]]
 
-        elif dataset == "KITTI":
-            inputleft = f"{input_root}/{row[0]}"
-            inputright = f"{input_root}/{row[1]}"
+        elif split == "eigen_train" and dataset == "KITTI":
+            inputleft = f"{input_root}{row[0]}"
+            inputright = f"{input_root}{row[1]}"
             files = [[inputleft, inputright], None]
 
-        elif dataset == "KITTI2015":
+        elif split == "bello_val" and dataset == "KITTI2015":
             inputleft_t0 = f"{input_root}/{row[0]}"
             inputright_t0 = f"{input_root}/{row[1]}"
             inputleft_t1 = f"{input_root}/{row[2]}"
@@ -68,7 +68,7 @@ def load_data(split, **kwargs):
     if shuffle_test:
         shuffle(datasetlist)
 
-    if dataset == "Kitti_eigen_test_improved":
+    if split == "eigen_test_improved" and dataset == "KITTI":
         dataset = TestListDataset(
             input_root,
             input_root,
@@ -79,7 +79,7 @@ def load_data(split, **kwargs):
             transform=transform,
             target_transform=target_transform,
         )
-    elif dataset == "KITTI":
+    elif split == "eigen_train" and dataset == "KITTI":
         dataset = TrainListDataset(
             input_root,
             input_root,
@@ -93,7 +93,7 @@ def load_data(split, **kwargs):
             reference_transform=reference_transform,
             fix=fix,
         )
-    elif dataset == "KITTI2015":
+    elif split == "bello_val" and dataset == "KITTI2015":
         dataset = TestListDataset(
             input_root,
             input_root,

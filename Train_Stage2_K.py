@@ -17,7 +17,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import os
-import argparse
 import datetime
 import time
 import numpy as np
@@ -38,20 +37,21 @@ from misc import utils
 from misc import data_transforms
 from misc.loss_functions import rec_loss_fnc, realEPE, smoothness, vgg
 
+
 def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
     best_rmse = -1
 
     save_path = "{},e{}es{},b{},lr{}".format(
-        args.m_model,
-        args.epochs,
+        args.model,
+        args.epochs2,
         str(args.epoch_size) if args.epoch_size > 0 else "",
         args.batch_size,
-        args.lr,
+        args.lr2,
     )
     timestamp = datetime.datetime.now().strftime("%m-%d-%H_%M")
     save_path = os.path.join(timestamp, save_path)
-    save_path = os.path.join(args.dataName0 + "_stage2", save_path)
+    save_path = os.path.join(args.dataset + "_stage2", save_path)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
@@ -96,10 +96,10 @@ def main(args, device="cpu"):
     )
 
     # Torch Data Set List
-    input_path = os.path.join(args.data, args.dataName0)
+    input_path = os.path.join(args.data_directory, args.dataset)
     train_dataset0 = load_data(
-        split=1,  # all for training
-        dataset=args.dataName0,
+        split=args.train_split,
+        dataset=args.dataset,
         root=input_path,
         transform=input_transform,
         target_transform=target_transform,
@@ -107,10 +107,10 @@ def main(args, device="cpu"):
         max_pix=args.max_disp,
         fix=True,
     )
-    input_path = os.path.join(args.data, args.vdataName)
+    input_path = os.path.join(args.data_directory, args.validation_dataset)
     test_dataset = load_data(
-        split=0,  # all to be tested
-        dataset=args.vdataName,
+        split=args.validation_split,
+        dataset=args.validation_dataset,
         root=input_path,
         disp=True,
         of=False,
@@ -142,21 +142,21 @@ def main(args, device="cpu"):
     # create model
     if args.pretrained:
         network_data = torch.load(args.pretrained)
-        args.m_model = network_data["m_model"]
-        print("=> using pre-trained model '{}'".format(args.m_model))
+        args.model = network_data["model"]
+        print("=> using pre-trained model '{}'".format(args.model))
     else:
         network_data = None
-        print("=> creating m model '{}'".format(args.m_model))
+        print("=> creating m model '{}'".format(args.model))
 
-    m_model = models.__dict__[args.m_model](
+    model = models.__dict__[args.model](
         network_data, no_levels=args.no_levels, device=device
     ).cuda()
-    m_model = torch.nn.DataParallel(m_model, device_ids=[0]).cuda()
-    print("=> Number of parameters m-model '{}'".format(utils.get_n_params(m_model)))
+    model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
+    print("=> Number of parameters m-model '{}'".format(utils.get_n_params(model)))
 
     # create fix model
     network_data = torch.load(args.fix_model)
-    fix_model_name = network_data["m_model"]
+    fix_model_name = network_data["model"]
     print("=> using pre-trained model '{}'".format(fix_model_name))
     fix_model = models.__dict__[fix_model_name](
         network_data, no_levels=args.no_levels
@@ -168,30 +168,32 @@ def main(args, device="cpu"):
     # Optimizer Settings
     print("Setting {} Optimizer".format(args.optimizer))
     param_groups = [
-        {"params": m_model.module.bias_parameters(), "weight_decay": args.bias_decay},
+        {"params": model.module.bias_parameters(), "weight_decay": args.bias_decay},
         {
-            "params": m_model.module.weight_parameters(),
+            "params": model.module.weight_parameters(),
             "weight_decay": args.weight_decay,
         },
     ]
     if args.optimizer == "adam":
         g_optimizer = torch.optim.Adam(
-            params=param_groups, lr=args.lr, betas=(args.momentum, args.beta)
+            params=param_groups, lr=args.lr2, betas=(args.momentum, args.beta)
         )
     g_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        g_optimizer, milestones=args.milestones, gamma=0.5
+        g_optimizer, milestones=args.milestones2, gamma=0.5
     )
 
     for epoch in range(args.start_epoch):
         g_scheduler.step()
 
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(args.start_epoch, args.epochs2):
         # train for one epoch
-        train_loss = train(args, train_loader0, m_model, fix_model, g_optimizer, epoch, device)
+        train_loss = train(
+            args, train_loader0, model, fix_model, g_optimizer, epoch, device
+        )
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
         # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-        rmse = validate(args, val_loader, m_model, epoch, output_writers, device)
+        rmse = validate(args, val_loader, model, epoch, output_writers, device)
         test_writer.add_scalar("mean RMSE", rmse, epoch)
 
         # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
@@ -204,8 +206,8 @@ def main(args, device="cpu"):
         utils.save_checkpoint(
             {
                 "epoch": epoch + 1,
-                "m_model": args.m_model,
-                "state_dict": m_model.module.state_dict(),
+                "model": args.model,
+                "state_dict": model.module.state_dict(),
                 "best_rmse": best_rmse,
             },
             is_best,
@@ -213,7 +215,7 @@ def main(args, device="cpu"):
         )
 
 
-def train(args, train_loader, m_model, fix_model, g_optimizer, epoch, device):
+def train(args, train_loader, model, fix_model, g_optimizer, epoch, device):
     epoch_size = (
         len(train_loader)
         if args.epoch_size == 0
@@ -226,7 +228,7 @@ def train(args, train_loader, m_model, fix_model, g_optimizer, epoch, device):
     losses = utils.AverageMeter()
 
     # switch to train mode
-    m_model.train()
+    model.train()
 
     end = time.time()
     for i, input_data0 in enumerate(train_loader):
@@ -274,7 +276,7 @@ def train(args, train_loader, m_model, fix_model, g_optimizer, epoch, device):
                 mrdisp = disp[B::, :, :, :].detach()
 
         ###### LEFT disp
-        pan, disp, mask0, mask1 = m_model(
+        pan, disp, mask0, mask1 = model(
             torch.cat(
                 (left_view, F.grid_sample(right_view, flip_grid, align_corners=True)), 0
             ),
@@ -324,7 +326,7 @@ def train(args, train_loader, m_model, fix_model, g_optimizer, epoch, device):
 
         # Compute smooth loss
         sm_loss = 0
-        if args.a_sm > 0:
+        if args.smooth2 > 0:
             # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
             sm_loss = (
                 smoothness(
@@ -361,7 +363,7 @@ def train(args, train_loader, m_model, fix_model, g_optimizer, epoch, device):
             ) / 2
 
         # compute gradient and do optimization step
-        loss = rec_loss + args.a_sm * sm_loss + args.a_mr * mirror_loss
+        loss = rec_loss + args.smooth2 * sm_loss + args.a_mr * mirror_loss
         losses.update(loss.detach().cpu(), args.batch_size)
         loss.backward()
         g_optimizer.step()
@@ -385,7 +387,7 @@ def train(args, train_loader, m_model, fix_model, g_optimizer, epoch, device):
     return losses.avg
 
 
-def validate(args, val_loader, m_model, epoch, output_writers, device):
+def validate(args, val_loader, model, epoch, output_writers, device):
 
     test_time = utils.AverageMeter()
     RMSES = utils.AverageMeter()
@@ -393,7 +395,7 @@ def validate(args, val_loader, m_model, epoch, output_writers, device):
     kitti_erros = utils.multiAverageMeter(utils.kitti_error_names)
 
     # switch to evaluate mode
-    m_model.eval()
+    model.eval()
 
     # Disable gradients to save memory
     with torch.no_grad():
@@ -412,7 +414,7 @@ def validate(args, val_loader, m_model, epoch, output_writers, device):
             # Prepare input data
             end = time.time()
             min_disp = max_disp * args.min_disp / args.max_disp
-            p_im, disp, maskL, maskRL = m_model(
+            p_im, disp, maskL, maskRL = model(
                 input_left,
                 min_disp,
                 max_disp,
