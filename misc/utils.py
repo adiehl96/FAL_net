@@ -173,9 +173,9 @@ def get_n_params(model):
     return pp
 
 
-def get_rmse(output_right, label_right, mean=(0.411, 0.432, 0.45)):
+def get_rmse(output_right, label_right, mean=(0.411, 0.432, 0.45), device="cpu"):
     # B, C, H, W = output_right.shape
-    mean_shift = torch.zeros(output_right.shape).cuda()
+    mean_shift = torch.zeros(output_right.shape).to(device)
     mean_shift[:, 0, :, :] = mean[0]
     mean_shift[:, 1, :, :] = mean[1]
     mean_shift[:, 2, :, :] = mean[2]
@@ -300,7 +300,7 @@ def disps_to_depths_kitti(gt_disparities, pred_disparities):
 
 # Obtain point cloud from estimated disparity
 # Expects rgb img (0-255) and disp in pixel units
-def get_point_cloud(img, disp):
+def get_point_cloud(img, disp, device="cpu"):
     b, c, h, w = disp.shape
 
     # Set camera parameters
@@ -313,7 +313,7 @@ def get_point_cloud(img, disp):
     z = focal * baseline / (disp + 0.0001)
 
     # Make normalized grid
-    i_tetha = torch.zeros(b, 2, 3).cuda()
+    i_tetha = torch.zeros(b, 2, 3).to(device)
     i_tetha[:, 0, 0] = 1
     i_tetha[:, 1, 1] = 1
     grid = F.affine_grid(i_tetha, [b, c, h, w], align_corners=False)

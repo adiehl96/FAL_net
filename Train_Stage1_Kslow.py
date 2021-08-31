@@ -457,7 +457,7 @@ def validate(val_loader, model, epoch, output_writers):
             test_time.update(time.time() - end)
 
             # Measure RMSE
-            rmse = utils.get_rmse(p_im, input_right)
+            rmse = utils.get_rmse(p_im, input_right, device=device)
             RMSES.update(rmse)
 
             # record EPE

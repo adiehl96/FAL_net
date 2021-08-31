@@ -254,7 +254,7 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                     m_rgb[:, 1, :, :] = 0.432 * m_rgb[:, 1, :, :]
                     m_rgb[:, 2, :, :] = 0.45 * m_rgb[:, 2, :, :]
                     point_cloud = utils.get_point_cloud(
-                        (input_left + m_rgb) * 255, disp
+                        (input_left + m_rgb) * 255, disp, device=device
                     )
                     utils.save_point_cloud(
                         point_cloud.squeeze(0).cpu().numpy(),

@@ -248,10 +248,13 @@ def main():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
     dataset_path = os.path.join(args.data_directory, args.dataset)
-    if not os.path.exists(dataset_path) and "KITTI" in args.dataset:
+    validation_dataset_path = os.path.join(args.data_directory, args.validation_dataset)
+    if (
+        not os.path.exists(dataset_path) or not os.path.exists(validation_dataset_path)
+    ) and ("KITTI" in args.dataset or "KITTI" in args.validation_dataset):
         if (
             input(
-                f"No data found at {dataset_path}. Would you like to download the {args.dataset} dataset? (y/n): "
+                f"No data found at either {dataset_path} or {validation_dataset_path}. Would you like to download KITTI and KITTI2015 dataset? (y/n): "
             )
             .lower()
             .strip()[:1]

@@ -44,7 +44,7 @@ Ofl_index = 1
 
 def img_loader(input_root, path_imgs, index):
     imgs = [os.path.join(input_root, path) for path in path_imgs]
-    return imread(imgs[index])
+    return imread(path_imgs[index])
 
 
 class ListDataset(data.Dataset):
