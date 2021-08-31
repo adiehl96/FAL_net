@@ -1,10 +1,12 @@
 import argparse
 import sys
 import os
-from misc.download_KITTI import download
+from misc.download import download_KITTI, download_KITTI2015
 
 
 def main():
+
+    print(" ".join(sys.argv[:]))
 
     parser = argparse.ArgumentParser(
         description="FAL_net in pytorch",
@@ -238,8 +240,6 @@ def main():
         "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"
     )
 
-    print(" ".join(sys.argv[:]))
-
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join(
@@ -248,19 +248,17 @@ def main():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
     dataset_path = os.path.join(args.data_directory, args.dataset)
-    if not os.path.exists(dataset_path):
-        if args.dataset == "KITTI" or args.dataset == "KITTI2015":
-            if (
-                input(
-                    f"No data found at {dataset_path}. Would you like to download the {args.dataset} dataset? (y/n): "
-                )
-                .lower()
-                .strip()[:1]
-                == "y"
-            ):
-                if args.dataset == "KITTI":
-                    download()
-                sys.exit(1)
+    if not os.path.exists(dataset_path) and "KITTI" in args.dataset:
+        if (
+            input(
+                f"No data found at {dataset_path}. Would you like to download the {args.dataset} dataset? (y/n): "
+            )
+            .lower()
+            .strip()[:1]
+            == "y"
+        ):
+            # download_KITTI()
+            download_KITTI2015()
 
     if not os.path.exists(dataset_path):
         print(f"Program aborts, as no data could be found at {dataset_path}.")

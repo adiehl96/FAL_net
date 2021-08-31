@@ -166,7 +166,6 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
     with torch.no_grad():
         print("with torch.no_grad():")
         for i, (input, target, _) in enumerate(val_loader):
-            # print("for i, (input, target, f_name) in enumerate(val_loader):", i)
             target = target[0].to(device)
             input_left = input[0].to(device)
             B, C, H, W = input_left.shape
