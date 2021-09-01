@@ -5,7 +5,6 @@ from misc.download import download_KITTI, download_KITTI2015
 
 
 def main():
-
     print(" ".join(sys.argv[:]))
 
     parser = argparse.ArgumentParser(
@@ -168,7 +167,7 @@ def main():
         "--modus_operandi",
         default="test",
         help="Select the modus operandi.",
-        choices=["test", "train1", "train2"],
+        choices=["test", "predict", "train1", "train2"],
     )
     parser.add_argument(
         "--milestones1",
@@ -207,6 +206,7 @@ def main():
         metavar="N",
         help="number of total epochs to run in train stage 2",
     )
+
     parser.add_argument(
         "--epoch_size",
         default=0,
@@ -240,7 +240,39 @@ def main():
         "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"
     )
 
-    args = parser.parse_args()
+    parser.add_argument(
+        "--input",
+        dest="input",
+        default="./test.png",
+        help="path to the input image to be depth predicted",
+    )
+
+    # parser.add_argument(
+    #     "--parser1", default="parser1", metavar="leeeeel", help="parser ident"
+    # )
+    args, _ = parser.parse_known_args()
+    print("type(args)", type(args))
+
+    # print("args.parser1", args.parser1)
+
+    # parser2 = argparse.ArgumentParser(
+    #     description="lel",
+    #     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    # )
+
+    # parser2.add_argument(
+    #     "--parser2", default="parser2", metavar="leeeeel2", help="parser ident"
+    # )
+
+    # parser2.add_argument(
+    #     "--parser1", default="parser2biatch", metavar="leeeeel2", help="parser ident"
+    # )
+
+    # args2, _ = parser2.parse_known_args()
+    # print("args2.parser2", args2.parser2)
+    # print("args2.parser1", args2.parser1)
+
+    # sys.exit(os.EX_OK)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join(
         [str(item) for item in args.gpu_indices]
@@ -283,6 +315,7 @@ def main():
     from Test_KITTI import main as test
     from Train_Stage1_K import main as train1
     from Train_Stage2_K import main as train2
+    from predict import predict
 
     device = torch.device("cuda" if args.gpu_indices else "cpu")
 
@@ -292,6 +325,8 @@ def main():
         train1(args, device)
     elif args.modus_operandi == "train2":
         train2(args, device)
+    elif args.modus_operandi == "predict":
+        predict(args, device)
     elif args.modus_operandi == "full":
         train1(args, device)
         train2(args, device)

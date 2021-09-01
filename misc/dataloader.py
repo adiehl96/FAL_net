@@ -70,8 +70,6 @@ def load_data(split, **kwargs):
 
     if split == "eigen_test_improved" and dataset == "KITTI":
         dataset = TestListDataset(
-            input_root,
-            input_root,
             datasetlist,
             data_name="Kitti_eigen_test_improved",
             disp=True,
@@ -95,8 +93,6 @@ def load_data(split, **kwargs):
         )
     elif split == "bello_val" and dataset == "KITTI2015":
         dataset = TestListDataset(
-            input_root,
-            input_root,
             datasetlist,
             data_name="Kitti2015",
             disp=disp_arg,

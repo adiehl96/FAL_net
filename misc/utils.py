@@ -191,19 +191,19 @@ def get_rmse(output_right, label_right, mean=(0.411, 0.432, 0.45), device="cpu")
 kitti_error_names = ["abs_rel", "sq_rel", "rms", "log_rms", "a1", "a2", "a3"]
 
 width_to_focal = dict()
-width_to_focal[1242] = 721.5377
-width_to_focal[1241] = 718.856
 width_to_focal[1224] = 707.0493
-width_to_focal[1238] = 718.3351
 width_to_focal[1226] = 707.0912
+width_to_focal[1238] = 718.3351
+width_to_focal[1241] = 718.856
+width_to_focal[1242] = 721.5377
 width_to_focal[1280] = 738.2355  # focal lenght upscaled
 
 width_to_baseline = dict()
-width_to_baseline[1242] = 0.9982 * 0.54
-width_to_baseline[1241] = 0.9848 * 0.54
 width_to_baseline[1224] = 1.0144 * 0.54
-width_to_baseline[1238] = 0.9847 * 0.54
 width_to_baseline[1226] = 0.9765 * 0.54
+width_to_baseline[1238] = 0.9847 * 0.54
+width_to_baseline[1241] = 0.9848 * 0.54
+width_to_baseline[1242] = 0.9982 * 0.54
 width_to_baseline[1280] = 0.54
 
 sum_cnt = 0
@@ -296,6 +296,28 @@ def disps_to_depths_kitti(gt_disparities, pred_disparities):
         pred_depths.append(pred_depth)
 
     return gt_depths, pred_depths
+
+
+def disp_to_depth(pred_disparities):
+    pred_depths = []
+
+    for i in range(len(pred_disparities)):
+        pred_disp = pred_disparities[i]
+
+        height, width = pred_disp.shape
+        pred_disp = pred_disp[height - 219 : height - 4, 44:1180]
+
+        pred_mask = pred_disp > 0
+
+        pred_depth = (
+            width_to_focal[width]
+            * width_to_baseline[width]
+            / (pred_disp + (1.0 - pred_mask))
+        )
+
+        pred_depths.append(pred_depth)
+
+    return pred_depths
 
 
 # Obtain point cloud from estimated disparity

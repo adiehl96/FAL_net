@@ -6,7 +6,7 @@ KITTI_stage2/
 Test_Results/
 data/*
 !data/README.md 
-
+predictions/
 temp/
 
 # Mac Specific

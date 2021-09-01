@@ -30,15 +30,12 @@ from misc.dataloader import load_data
 import torch
 import torch.utils.data
 import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torchvision.transforms as transforms
-import torch.nn.functional as F
+from torch.backends import cudnn
+from torchvision import transforms
+from torch.nn import functional as F
 
 from misc import utils, data_transforms
 from misc.loss_functions import realEPE
-
-
-model_names = sorted(name for name in models.__all__)
 
 
 def main(args, device="cpu"):
