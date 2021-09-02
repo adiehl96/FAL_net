@@ -12,6 +12,7 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 from misc.listdataset_run import ListDataset as RunListDataset
+import matplotlib.pyplot as plt
 
 from misc import utils, data_transforms
 
@@ -105,14 +106,6 @@ def predict(args, device="cpu"):
     if not os.path.exists(pan_path):
         os.makedirs(pan_path)
 
-    pc_path = os.path.join(save_path, "Point_cloud")
-    if not os.path.exists(pc_path):
-        os.makedirs(pc_path)
-
-    feats_path = os.path.join(save_path, "feats")
-    if not os.path.exists(feats_path):
-        os.makedirs(feats_path)
-
     # Set the max disp
     right_shift = args.max_disp * args.rel_baset
 
@@ -150,14 +143,25 @@ def predict(args, device="cpu"):
             if args.ms_post_process:
                 disp = ms_pp(input_left, pan_model, flip_grid, disp, min_disp, max_disp)
 
-            pred_disp = disp.squeeze(1).cpu().numpy()
-            pred_depth = utils.disp_to_depth(pred_disp)
-            print("pred_depth", pred_depth[0].shape)
-            denormalize = np.array([0.411, 0.432, 0.45])
-            denormalize = denormalize[:, np.newaxis, np.newaxis]
-            im = pred_depth[0] + denormalize
-            im = Image.fromarray(np.rint(255 * im.transpose(1, 2, 0)).astype(np.uint8))
-            im.save(os.path.join(pan_path, "{:010d}.png".format(i)))
+            disparity = disp.squeeze().cpu().numpy()
+            disparity = 256 * np.clip(
+                disparity / (np.percentile(disparity, 99) + 1e-9), 0, 1
+            )
+            plt.imsave(
+                os.path.join(l_disp_path, "{:010d}.png".format(i)),
+                np.rint(disparity).astype(np.int32),
+                cmap="inferno",
+                vmin=0,
+                vmax=256,
+            )
+            # pred_disp = disp.squeeze(1).cpu().numpy()
+            # pred_depth = utils.disp_to_depth(pred_disp)
+            # print("pred_depth", pred_depth[0].shape)
+            # denormalize = np.array([0.411, 0.432, 0.45])
+            # denormalize = denormalize[:, np.newaxis, np.newaxis]
+            # im = pred_depth[0] + denormalize
+            # im = Image.fromarray(np.rint(255 * im.transpose(1, 2, 0)).astype(np.uint8))
+            # im.save(os.path.join(pan_path, "{:010d}.png".format(i)))
 
 
 def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):

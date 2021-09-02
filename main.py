@@ -75,13 +75,13 @@ def main():
         default=0.999,
     )
     parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=640)
-    parser.add_argument("-save", "--save", default=False)
+    parser.add_argument("-save", "--save", action="store_true", default=False)
     parser.add_argument("--lr1", metavar="Initial Learning Rate Train1", default=0.0001)
     parser.add_argument(
         "--lr2", metavar="Initial Learning Rate Train2", default=0.00005
     )
-    parser.add_argument("-save_pc", "--save_pc", default=False)
-    parser.add_argument("-save_pan", "--save_pan", default=False)
+    parser.add_argument("-save_pc", "--save_pc", action="store_true", default=False)
+    parser.add_argument("-save_pan", "--save_pan", action="store_true", default=False)
     parser.add_argument(
         "--momentum",
         default=0.5,
@@ -93,7 +93,9 @@ def main():
     parser.add_argument(
         "-ch", "--crop_height", metavar="Batch crop H Size", default=192
     )
-    parser.add_argument("-save_input", "--save_input", default=False)
+    parser.add_argument(
+        "-save_input", "--save_input", action="store_true", default=False
+    )
     parser.add_argument("-w", "--workers", metavar="Workers", default=4, type=int)
     parser.add_argument(
         "--sparse",
@@ -251,7 +253,7 @@ def main():
     #     "--parser1", default="parser1", metavar="leeeeel", help="parser ident"
     # )
     args, _ = parser.parse_known_args()
-    print("type(args)", type(args))
+    # print("type(args)", type(args))
 
     # print("args.parser1", args.parser1)
 
@@ -312,10 +314,10 @@ def main():
 
     import torch
 
-    from Test_KITTI import main as test
-    from Train_Stage1_K import main as train1
-    from Train_Stage2_K import main as train2
-    from predict import predict
+    from src.Test_KITTI import main as test
+    from src.Train_Stage1_K import main as train1
+    from src.Train_Stage2_K import main as train2
+    from src.predict import predict
 
     device = torch.device("cuda" if args.gpu_indices else "cpu")
 
