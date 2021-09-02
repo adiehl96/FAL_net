@@ -29,6 +29,7 @@ import torch
 import torch.utils.data
 import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
+from torch.cuda.amp import GradScaler, autocast
 
 # Usefull tensorboard call
 # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
@@ -176,11 +177,12 @@ def main(args, device="cpu"):
         g_scheduler.step()
 
     vgg_loss = VGGLoss(device=device)
+    scaler = GradScaler()
 
     for epoch in range(args.start_epoch, args.epochs1):
         # train for one epoch
         train_loss = train(
-            args, train_loader0, model, g_optimizer, epoch, device, vgg_loss
+            args, train_loader0, model, g_optimizer, epoch, device, vgg_loss, scaler
         )
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
@@ -207,7 +209,7 @@ def main(args, device="cpu"):
         )
 
 
-def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss):
+def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scaler):
     epoch_size = (
         len(train_loader)
         if args.epoch_size == 0
@@ -236,44 +238,48 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss):
         # Reset gradients
         g_optimizer.zero_grad()
 
-        ###### LEFT disp
-        min_disp = max_disp * args.min_disp / args.max_disp
-        rpan, ldisp = model(
-            input_left=left_view,
-            min_disp=min_disp,
-            max_disp=max_disp,
-            ret_disp=True,
-            ret_pan=True,
-            ret_subocc=False,
-        )
-        # Compute rec loss
-
-        if args.a_p > 0:
-            vgg_right = vgg_loss.vgg(right_view)
-        else:
-            vgg_right = None
-
-        # Over 2 as measured twice for left and right
-        mask = 1
-        rec_loss = vgg_loss.rec_loss_fnc(mask, rpan, right_view, vgg_right, args.a_p)
-        rec_losses.update(rec_loss.detach().cpu(), args.batch_size)
-
-        #  Compute smooth loss
-        sm_loss = 0
-        if args.smooth1 > 0:
-            # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
-            sm_loss = smoothness(
-                left_view[:, :, :, int(0.20 * W) : :],
-                ldisp[:, :, :, int(0.20 * W) : :],
-                gamma=2,
-                device=device,
+        with autocast():
+            ###### LEFT disp
+            min_disp = max_disp * args.min_disp / args.max_disp
+            rpan, ldisp = model(
+                input_left=left_view,
+                min_disp=min_disp,
+                max_disp=max_disp,
+                ret_disp=True,
+                ret_pan=True,
+                ret_subocc=False,
             )
+            # Compute rec loss
 
-        # compute gradient and do optimization step
-        loss = rec_loss + args.smooth1 * sm_loss
-        losses.update(loss.detach().cpu(), args.batch_size)
-        loss.backward()
-        g_optimizer.step()
+            if args.a_p > 0:
+                vgg_right = vgg_loss.vgg(right_view)
+            else:
+                vgg_right = None
+
+            # Over 2 as measured twice for left and right
+            mask = 1
+            rec_loss = vgg_loss.rec_loss_fnc(
+                mask, rpan, right_view, vgg_right, args.a_p
+            )
+            rec_losses.update(rec_loss.detach().cpu(), args.batch_size)
+
+            #  Compute smooth loss
+            sm_loss = 0
+            if args.smooth1 > 0:
+                # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
+                sm_loss = smoothness(
+                    left_view[:, :, :, int(0.20 * W) : :],
+                    ldisp[:, :, :, int(0.20 * W) : :],
+                    gamma=2,
+                    device=device,
+                )
+
+            # compute gradient and do optimization step
+            loss = rec_loss + args.smooth1 * sm_loss
+            losses.update(loss.detach().cpu(), args.batch_size)
+        scaler.scale(loss).backward()
+        scaler.step(g_optimizer)
+        scaler.update()
         g_optimizer.zero_grad()
 
         # measure elapsed time
