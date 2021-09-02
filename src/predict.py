@@ -1,7 +1,6 @@
 import os
 
 import numpy as np
-from PIL import Image
 
 import models
 
@@ -42,7 +41,6 @@ def predict(args, device="cpu"):
     )
 
     # Torch Data Set List
-    input_path = os.path.join(args.data_directory, args.dataset)
     test_dataset = RunListDataset(
         path_list=[args.input],
         transform=input_transform,
@@ -50,11 +48,9 @@ def predict(args, device="cpu"):
 
     print("len(test_dataset)", len(test_dataset))
     # Torch Data Loader
-    args.batch_size = 1  # kitty mixes image sizes!
-    args.sparse = True  # disparities are sparse (from lidar)
     val_loader = torch.utils.data.DataLoader(
         test_dataset,
-        batch_size=args.batch_size,
+        batch_size=1,  # kitty mixes image sizes!
         num_workers=args.workers,
         pin_memory=False,
         shuffle=False,
@@ -85,10 +81,10 @@ def predict(args, device="cpu"):
     print("=> using pre-trained model for pan '{}'".format(pan_model))
     pan_model = models.__dict__[pan_model](
         pan_network_data, no_levels=args.no_levels, device=device
-    ).to(device)
-    pan_model = torch.nn.DataParallel(pan_model).to(device)
+    )
+    pan_model = torch.nn.DataParallel(pan_model)
     if device.type == "cpu":
-        pan_model = pan_model.module.to(device)
+        pan_model = pan_model.module
     pan_model.eval()
     model_parameters = utils.get_n_params(pan_model)
     print("=> Number of parameters '{}'".format(model_parameters))
@@ -97,14 +93,6 @@ def predict(args, device="cpu"):
     l_disp_path = os.path.join(save_path, "l_disp")
     if not os.path.exists(l_disp_path):
         os.makedirs(l_disp_path)
-
-    input_path = os.path.join(save_path, "Input im")
-    if not os.path.exists(input_path):
-        os.makedirs(input_path)
-
-    pan_path = os.path.join(save_path, "Pan")
-    if not os.path.exists(pan_path):
-        os.makedirs(pan_path)
 
     # Set the max disp
     right_shift = args.max_disp * args.rel_baset
@@ -154,14 +142,6 @@ def predict(args, device="cpu"):
                 vmin=0,
                 vmax=256,
             )
-            # pred_disp = disp.squeeze(1).cpu().numpy()
-            # pred_depth = utils.disp_to_depth(pred_disp)
-            # print("pred_depth", pred_depth[0].shape)
-            # denormalize = np.array([0.411, 0.432, 0.45])
-            # denormalize = denormalize[:, np.newaxis, np.newaxis]
-            # im = pred_depth[0] + denormalize
-            # im = Image.fromarray(np.rint(255 * im.transpose(1, 2, 0)).astype(np.uint8))
-            # im.save(os.path.join(pan_path, "{:010d}.png".format(i)))
 
 
 def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):
