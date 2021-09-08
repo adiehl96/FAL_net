@@ -85,7 +85,6 @@ def load_data(split, **kwargs):
             disp=False,
             of=False,
             transform=transform,
-            target_transform=target_transform,
             co_transform=co_transform,
             max_pix=max_pix,
             reference_transform=reference_transform,

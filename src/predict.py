@@ -2,8 +2,6 @@ import os
 
 import numpy as np
 
-import models
-
 import torch
 import torch.utils.data
 import torch.nn.parallel
@@ -13,13 +11,18 @@ import torch.nn.functional as F
 from misc.listdataset_run import ListDataset as RunListDataset
 import matplotlib.pyplot as plt
 
+from models.FAL_netB import FAL_netB
 from misc import utils, data_transforms
 
 
 def predict(args, device="cpu"):
     print("-------Predicting on " + str(device) + "-------")
 
-    save_path = os.path.join("predictions", args.dataset, args.model, args.time_stamp)
+    if args.model.isdigit():
+        save_path = os.path.join("predict", args.model.zfill(10))
+    else:
+        model_number = args.model.split("/")[-2].zfill(10)
+        save_path = os.path.join("predict", model_number)
     if args.f_post_process:
         save_path = save_path + "fpp"
     if args.ms_post_process:
@@ -41,15 +44,15 @@ def predict(args, device="cpu"):
     )
 
     # Torch Data Set List
-    test_dataset = RunListDataset(
+    predict_dataset = RunListDataset(
         path_list=[args.input],
         transform=input_transform,
     )
 
-    print("len(test_dataset)", len(test_dataset))
+    print("len(predict_dataset)", len(predict_dataset))
     # Torch Data Loader
     val_loader = torch.utils.data.DataLoader(
-        test_dataset,
+        predict_dataset,
         batch_size=1,  # kitty mixes image sizes!
         num_workers=args.workers,
         pin_memory=False,
@@ -57,35 +60,25 @@ def predict(args, device="cpu"):
     )
 
     # create pan model
-    model_path = os.path.join(
-        args.dataset + "_stage2",
-        args.time_stamp,
-    )
-    if not os.path.exists(model_path):
-        raise Exception(
-            f"No pretrained model with timestamp {args.pretrained} was found."
+    if args.model.isdigit():
+        model_path = os.path.join(
+            args.dataset + "_stage2", args.model.zfill(10), "model_best.pth.tar"
         )
-    model_path = os.path.join(
-        model_path,
-        next(d for d in (next(os.walk(model_path))[1]) if not d[0] == "."),
-        "model_best.pth.tar",
-    )
+        if not os.path.exists(model_path):
+            model_path = os.path.join(
+                args.dataset + "_stage2", args.model.zfill(10), "checkpoint.pth.tar"
+            )
+    else:
+        model_path = args.model
 
     print(model_path)
-    pan_network_data = torch.load(model_path, map_location=torch.device(device))
 
-    pan_model = pan_network_data[
-        next(item for item in pan_network_data.keys() if "model" in str(item))
-    ]
+    pan_model = FAL_netB(no_levels=args.no_levels, device=device)
+    checkpoint = torch.load(model_path, map_location=device)
+    pan_model.load_state_dict(checkpoint["model_state_dict"])
+    if device.type == "cuda":
+        pan_model = torch.nn.DataParallel(pan_model).to(device)
 
-    print("=> using pre-trained model for pan '{}'".format(pan_model))
-    pan_model = models.__dict__[pan_model](
-        pan_network_data, no_levels=args.no_levels, device=device
-    )
-    pan_model = torch.nn.DataParallel(pan_model)
-    if device.type == "cpu":
-        pan_model = pan_model.module
-    pan_model.eval()
     model_parameters = utils.get_n_params(pan_model)
     print("=> Number of parameters '{}'".format(model_parameters))
     cudnn.benchmark = True
@@ -98,7 +91,6 @@ def predict(args, device="cpu"):
     right_shift = args.max_disp * args.rel_baset
 
     with torch.no_grad():
-        print("with torch.no_grad():")
         for i, (input, _, _) in enumerate(val_loader):
             input_left = input[0].to(device)
             B, C, H, W = input_left.shape

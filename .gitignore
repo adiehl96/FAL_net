@@ -3,10 +3,10 @@ Kitti_stage1/
 KITTI_stage1/
 Kitti_stage2/
 KITTI_stage2/
-Test_Results/
+test_KITTI/
 data/*
 !data/README.md 
-predictions/
+predict/
 temp/
 
 # Mac Specific

@@ -18,12 +18,11 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import os
-import datetime
 import time
 import numpy as np
 
 from misc.dataloader import load_data
-import models
+from models.FAL_netB import FAL_netB
 
 import torch
 import torch.utils.data
@@ -42,16 +41,13 @@ def main(args, device="cpu"):
     print("-------Training Stage 1 on " + str(device) + "-------")
     best_rmse = -1
 
-    save_path = "{},e{}es{},b{},lr{}".format(
-        args.model,
-        args.epochs1,
-        str(args.epoch_size) if args.epoch_size > 0 else "",
-        args.batch_size,
-        args.lr1,
-    )
-    timestamp = datetime.datetime.now().strftime("%m-%d-%H_%M")
-    save_path = os.path.join(timestamp, save_path)
-    save_path = os.path.join(args.dataset + "_stage1", save_path)
+    save_path = os.path.join(args.dataset + "_stage1")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    _, sub_directories, _ = next(os.walk(save_path))
+    filtered = filter(lambda x: x.isdigit(), sorted(sub_directories))
+    idx = len(list(filtered))
+    save_path = os.path.join(save_path, str(idx).zfill(10))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
@@ -140,20 +136,14 @@ def main(args, device="cpu"):
     print("len(val_loader)", len(val_loader))
 
     # create model
+    model = FAL_netB(no_levels=args.no_levels, device=device)
     if args.pretrained:
-        network_data = torch.load(args.pretrained)
-        args.model = network_data[
-            next(item for item in network_data.keys() if "model" in str(item))
-        ]
-        print("=> using pre-trained model '{}'".format(args.model))
-    else:
-        network_data = None
-        print("=> creating m model '{}'".format(args.model))
+        checkpoint = torch.load(args.pretrained, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
 
-    model = models.__dict__[args.model](
-        network_data, no_levels=args.no_levels, device=device
-    ).to(device)
-    model = torch.nn.DataParallel(model).to(device)
+    if device.type == "cuda":
+        print("torch.nn.DataParallel(model).to(device)")
+        model = torch.nn.DataParallel(model).to(device)
     print("=> Number of parameters model '{}'".format(utils.get_n_params(model)))
 
     # Optimizer Settings
@@ -181,7 +171,7 @@ def main(args, device="cpu"):
 
     for epoch in range(args.start_epoch, args.epochs1):
         # train for one epoch
-        train_loss = train(
+        loss, train_loss = train(
             args, train_loader0, model, g_optimizer, epoch, device, vgg_loss, scaler
         )
         train_writer.add_scalar("train_loss", train_loss, epoch)
@@ -199,10 +189,12 @@ def main(args, device="cpu"):
         best_rmse = min(rmse, best_rmse)
         utils.save_checkpoint(
             {
-                "epoch": epoch + 1,
-                "model": args.model,
-                "state_dict": model.module.state_dict(),
-                "best_rmse": best_rmse,
+                "epoch": epoch,
+                "model_state_dict": model.module.state_dict()
+                if isinstance(model, torch.nn.DataParallel)
+                else model.state_dict(),
+                "optimizer_state_dict": g_optimizer.state_dict(),
+                "loss": loss,
             },
             is_best,
             save_path,
@@ -298,7 +290,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
         if i >= epoch_size:
             break
 
-    return losses.avg
+    return loss, losses.avg
 
 
 def validate(args, val_loader, model, epoch, output_writers, device):

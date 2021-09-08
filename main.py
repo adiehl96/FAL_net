@@ -281,36 +281,39 @@ def main():
     )
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 
-    dataset_path = os.path.join(args.data_directory, args.dataset)
-    if not os.path.exists(dataset_path) and args.dataset == "KITTI":
-        print(f"No data found at {dataset_path}.")
-        if (
-            input(f"Would you like to download {args.dataset} dataset? (y/n): ")
-            .lower()
-            .strip()[:1]
-            == "y"
-        ):
-            download_KITTI()
+    if args.modus_operandi in ["test", "train1", "train2", "full"]:
+        dataset_path = os.path.join(args.data_directory, args.dataset)
+        if not os.path.exists(dataset_path) and args.dataset == "KITTI":
+            print(f"No data found at {dataset_path}.")
+            if (
+                input(f"Would you like to download {args.dataset} dataset? (y/n): ")
+                .lower()
+                .strip()[:1]
+                == "y"
+            ):
+                download_KITTI()
 
-    validation_dataset_path = os.path.join(args.data_directory, args.validation_dataset)
-    if (
-        not os.path.exists(validation_dataset_path)
-        and args.validation_dataset == "KITTI2015"
-    ):
-        print(f"No data found at {validation_dataset_path}.")
+        validation_dataset_path = os.path.join(
+            args.data_directory, args.validation_dataset
+        )
         if (
-            input(
-                f"Would you like to download {args.validation_dataset} dataset? (y/n): "
-            )
-            .lower()
-            .strip()[:1]
-            == "y"
+            not os.path.exists(validation_dataset_path)
+            and args.validation_dataset == "KITTI2015"
         ):
-            download_KITTI2015()
+            print(f"No data found at {validation_dataset_path}.")
+            if (
+                input(
+                    f"Would you like to download {args.validation_dataset} dataset? (y/n): "
+                )
+                .lower()
+                .strip()[:1]
+                == "y"
+            ):
+                download_KITTI2015()
 
-    if not os.path.exists(dataset_path):
-        print(f"Program aborts, as no data could be found at {dataset_path}.")
-        sys.exit(1)
+        if not os.path.exists(dataset_path):
+            print(f"Program aborts, as no data could be found at {dataset_path}.")
+            sys.exit(1)
 
     import torch
 

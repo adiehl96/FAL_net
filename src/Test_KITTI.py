@@ -24,7 +24,7 @@ from imageio import imsave
 import matplotlib.pyplot as plt
 from PIL import Image
 
-import models
+from models.FAL_netB import FAL_netB
 from misc.dataloader import load_data
 
 import torch
@@ -41,7 +41,11 @@ from misc.loss_functions import realEPE
 def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
 
-    save_path = os.path.join("Test_Results", args.dataset, args.model, args.time_stamp)
+    if args.model.isdigit():
+        save_path = os.path.join("test_" + args.dataset, args.model.zfill(10))
+    else:
+        model_number = args.model.split("/")[-2].zfill(10)
+        save_path = os.path.join("test_" + args.dataset, model_number)
     if args.f_post_process:
         save_path = save_path + "fpp"
     if args.ms_post_process:
@@ -94,34 +98,25 @@ def main(args, device="cpu"):
     )
 
     # create pan model
-    model_path = os.path.join(
-        args.dataset + "_stage2",
-        args.time_stamp,
-    )
-    if not os.path.exists(model_path):
-        raise Exception(
-            f"No pretrained model with timestamp {args.pretrained} was found."
+    if args.model.isdigit():
+        model_path = os.path.join(
+            args.dataset + "_stage2", args.model.zfill(10), "model_best.pth.tar"
         )
-    model_path = os.path.join(
-        model_path,
-        next(d for d in (next(os.walk(model_path))[1]) if not d[0] == "."),
-        "model_best.pth.tar",
-    )
+        if not os.path.exists(model_path):
+            model_path = os.path.join(
+                args.dataset + "_stage2", args.model.zfill(10), "checkpoint.pth.tar"
+            )
+    else:
+        model_path = args.model
 
     print(model_path)
-    pan_network_data = torch.load(model_path, map_location=torch.device(device))
 
-    pan_model = pan_network_data[
-        next(item for item in pan_network_data.keys() if "model" in str(item))
-    ]
+    pan_model = FAL_netB(no_levels=args.no_levels, device=device)
+    checkpoint = torch.load(model_path, map_location=device)
+    pan_model.load_state_dict(checkpoint["model_state_dict"])
+    if device.type == "cuda":
+        pan_model = torch.nn.DataParallel(pan_model).to(device)
 
-    print("=> using pre-trained model for pan '{}'".format(pan_model))
-    pan_model = models.__dict__[pan_model](
-        pan_network_data, no_levels=args.no_levels, device=device
-    ).to(device)
-    pan_model = torch.nn.DataParallel(pan_model).to(device)
-    if device.type == "cpu":
-        pan_model = pan_model.module.to(device)
     pan_model.eval()
     model_parameters = utils.get_n_params(pan_model)
     print("=> Number of parameters '{}'".format(model_parameters))

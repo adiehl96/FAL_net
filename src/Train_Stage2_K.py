@@ -17,18 +17,20 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import os
-import datetime
 import time
 import numpy as np
 
 from misc.dataloader import load_data
 import models
+from models.FAL_netB import FAL_netB
 
 import torch
 import torch.utils.data
 import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
 import torch.nn.functional as F
+from torch.cuda.amp import GradScaler, autocast
+
 
 # Usefull tensorboard call
 # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
@@ -42,16 +44,13 @@ def main(args, device="cpu"):
     print("-------Training Stage 2 on " + str(device) + "-------")
     best_rmse = -1
 
-    save_path = "{},e{}es{},b{},lr{}".format(
-        args.model,
-        args.epochs2,
-        str(args.epoch_size) if args.epoch_size > 0 else "",
-        args.batch_size,
-        args.lr2,
-    )
-    timestamp = datetime.datetime.now().strftime("%m-%d-%H_%M")
-    save_path = os.path.join(timestamp, save_path)
-    save_path = os.path.join(args.dataset + "_stage2", save_path)
+    save_path = os.path.join(args.dataset + "_stage2")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    _, sub_directories, _ = next(os.walk(save_path))
+    filtered = filter(lambda x: x.isdigit(), sorted(sub_directories))
+    idx = len(list(filtered))
+    save_path = os.path.join(save_path, str(idx).zfill(10))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
@@ -179,31 +178,25 @@ def main(args, device="cpu"):
 
     # create fix model
 
-    if len(args.fix_model) > 11:
-        network_data = torch.load(args.fix_model)
-    else:
+    if args.fix_model.isdigit():
         fix_model_path = os.path.join(
-            args.dataset + "_stage1",
-            args.fix_model,
+            args.dataset + "_stage1", args.fix_model.zfill(10), "model_best.pth.tar"
         )
         if not os.path.exists(fix_model_path):
-            raise Exception(f"No fix model with timestamp {args.fix_model} was found.")
-        fix_model_path = os.path.join(
-            fix_model_path,
-            next(d for d in (next(os.walk(fix_model_path))[1]) if not d[0] == "."),
-            "checkpoint.pth.tar",
-        )
-        network_data = torch.load(fix_model_path)
+            fix_model_path = os.path.join(
+                args.dataset + "_stage1", args.fix_model.zfill(10), "checkpoint.pth.tar"
+            )
+    else:
+        fix_model_path = args.fix_model
 
-    fix_model_name = network_data[
-        next(item for item in network_data.keys() if "model" in str(item))
-    ]
-    print("=> using pre-trained model '{}'".format(fix_model_name))
-    fix_model = models.__dict__[fix_model_name](
-        network_data, no_levels=args.no_levels
-    ).to(device)
-    fix_model = torch.nn.DataParallel(fix_model).to(device)
+    fix_model = FAL_netB(no_levels=args.no_levels, device=device)
+    checkpoint = torch.load(fix_model_path, map_location=device)
+    fix_model.load_state_dict(checkpoint["model_state_dict"])
+    if device.type == "cuda":
+        fix_model = torch.nn.DataParallel(fix_model).to(device)
+
     print("=> Number of parameters m-model '{}'".format(utils.get_n_params(fix_model)))
+
     fix_model.eval()
 
     # Optimizer Settings
@@ -227,11 +220,20 @@ def main(args, device="cpu"):
         g_scheduler.step()
 
     vgg_loss = VGGLoss(device=device)
+    scaler = GradScaler()
 
     for epoch in range(args.start_epoch, args.epochs2):
         # train for one epoch
-        train_loss = train(
-            args, train_loader0, model, fix_model, g_optimizer, epoch, device, vgg_loss
+        loss, train_loss = train(
+            args,
+            train_loader0,
+            model,
+            fix_model,
+            g_optimizer,
+            epoch,
+            device,
+            vgg_loss,
+            scaler,
         )
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
@@ -248,17 +250,21 @@ def main(args, device="cpu"):
         best_rmse = min(rmse, best_rmse)
         utils.save_checkpoint(
             {
-                "epoch": epoch + 1,
-                "model": args.model,
-                "state_dict": model.module.state_dict(),
-                "best_rmse": best_rmse,
+                "epoch": epoch,
+                "model_state_dict": model.module.state_dict()
+                if isinstance(model, torch.nn.DataParallel)
+                else model.state_dict(),
+                "optimizer_state_dict": g_optimizer.state_dict(),
+                "loss": loss,
             },
             is_best,
             save_path,
         )
 
 
-def train(args, train_loader, model, fix_model, g_optimizer, epoch, device, vgg_loss):
+def train(
+    args, train_loader, model, fix_model, g_optimizer, epoch, device, vgg_loss, scaler
+):
     epoch_size = (
         len(train_loader)
         if args.epoch_size == 0
@@ -318,98 +324,105 @@ def train(args, train_loader, model, fix_model, g_optimizer, epoch, device, vgg_
                 ).detach()
                 mrdisp = disp[B::, :, :, :].detach()
 
-        ###### LEFT disp
-        pan, disp, mask0, mask1 = model(
-            torch.cat(
-                (left_view, F.grid_sample(right_view, flip_grid, align_corners=True)), 0
-            ),
-            torch.cat((min_disp, min_disp), 0),
-            torch.cat((max_disp, max_disp), 0),
-            ret_disp=True,
-            ret_pan=True,
-            ret_subocc=True,
-        )
-        rpan = pan[0:B, :, :, :]
-        lpan = pan[B::, :, :, :]
-        ldisp = disp[0:B, :, :, :]
-        rdisp = disp[B::, :, :, :]
+        with autocast():
+            ###### LEFT disp
+            pan, disp, mask0, mask1 = model(
+                torch.cat(
+                    (
+                        left_view,
+                        F.grid_sample(right_view, flip_grid, align_corners=True),
+                    ),
+                    0,
+                ),
+                torch.cat((min_disp, min_disp), 0),
+                torch.cat((max_disp, max_disp), 0),
+                ret_disp=True,
+                ret_pan=True,
+                ret_subocc=True,
+            )
+            rpan = pan[0:B, :, :, :]
+            lpan = pan[B::, :, :, :]
+            ldisp = disp[0:B, :, :, :]
+            rdisp = disp[B::, :, :, :]
 
-        lmask = mask0[0:B, :, :, :]
-        rmask = mask0[B::, :, :, :]
-        rlmask = mask1[0:B, :, :, :]
-        lrmask = mask1[B::, :, :, :]
+            lmask = mask0[0:B, :, :, :]
+            rmask = mask0[B::, :, :, :]
+            rlmask = mask1[0:B, :, :, :]
+            lrmask = mask1[B::, :, :, :]
 
-        # Unflip right view stuff
-        lpan = F.grid_sample(lpan, flip_grid, align_corners=True)
-        rdisp = F.grid_sample(rdisp, flip_grid, align_corners=True)
-        rmask = F.grid_sample(rmask, flip_grid, align_corners=True)
-        lrmask = F.grid_sample(lrmask, flip_grid, align_corners=True)
+            # Unflip right view stuff
+            lpan = F.grid_sample(lpan, flip_grid, align_corners=True)
+            rdisp = F.grid_sample(rdisp, flip_grid, align_corners=True)
+            rmask = F.grid_sample(rmask, flip_grid, align_corners=True)
+            lrmask = F.grid_sample(lrmask, flip_grid, align_corners=True)
 
-        # Compute rec loss
-        if args.a_p > 0:
-            vgg_right = vgg_loss.vgg(right_view)
-            vgg_left = vgg_loss.vgg(left_view)
-        else:
-            vgg_right = None
-            vgg_left = None
-        # Obtain final occlusion masks
-        O_L = lmask * lrmask
-        O_L[:, :, :, 0 : int(0.20 * W)] = 1
-        O_R = rmask * rlmask
-        O_R[:, :, :, int(0.80 * W) : :] = 1
-        if args.a_mr == 0:  # no mirror loss, then it is just more training
-            O_L = 1
-            O_R = 1
-        # Over 2 as measured twice for left and right
-        rec_loss = (
-            vgg_loss.rec_loss_fnc(O_R, rpan, right_view, vgg_right, args.a_p)
-            + vgg_loss.rec_loss_fnc(O_L, lpan, left_view, vgg_left, args.a_p)
-        ) / 2
-        rec_losses.update(rec_loss.detach().cpu(), args.batch_size)
-
-        # Compute smooth loss
-        sm_loss = 0
-        if args.smooth2 > 0:
-            # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
-            sm_loss = (
-                smoothness(
-                    left_view[:, :, :, int(0.20 * W) : :],
-                    ldisp[:, :, :, int(0.20 * W) : :],
-                    gamma=2,
-                    device=device,
-                )
-                + smoothness(
-                    right_view[:, :, :, 0 : int(0.80 * W)],
-                    rdisp[:, :, :, 0 : int(0.80 * W)],
-                    gamma=2,
-                    device=device,
-                )
+            # Compute rec loss
+            if args.a_p > 0:
+                vgg_right = vgg_loss.vgg(right_view)
+                vgg_left = vgg_loss.vgg(left_view)
+            else:
+                vgg_right = None
+                vgg_left = None
+            # Obtain final occlusion masks
+            O_L = lmask * lrmask
+            O_L[:, :, :, 0 : int(0.20 * W)] = 1
+            O_R = rmask * rlmask
+            O_R[:, :, :, int(0.80 * W) : :] = 1
+            if args.a_mr == 0:  # no mirror loss, then it is just more training
+                O_L = 1
+                O_R = 1
+            # Over 2 as measured twice for left and right
+            rec_loss = (
+                vgg_loss.rec_loss_fnc(O_R, rpan, right_view, vgg_right, args.a_p)
+                + vgg_loss.rec_loss_fnc(O_L, lpan, left_view, vgg_left, args.a_p)
             ) / 2
+            rec_losses.update(rec_loss.detach().cpu(), args.batch_size)
 
-        # Compute mirror loss
-        mirror_loss = 0
-        if args.a_mr > 0:
-            # Normalize error ~ between 0-1, by diving over the max disparity value
-            nmaxl = 1 / F.max_pool2d(mldisp, kernel_size=(H, W))
-            nmaxr = 1 / F.max_pool2d(mrdisp, kernel_size=(H, W))
-            mirror_loss = (
-                torch.mean(
-                    nmaxl
-                    * (1 - O_L)[:, :, :, int(0.20 * W) : :]
-                    * torch.abs(ldisp - mldisp)[:, :, :, int(0.20 * W) : :]
-                )
-                + torch.mean(
-                    nmaxr
-                    * (1 - O_R)[:, :, :, 0 : int(0.80 * W)]
-                    * torch.abs(rdisp - mrdisp)[:, :, :, 0 : int(0.80 * W)]
-                )
-            ) / 2
+            # Compute smooth loss
+            sm_loss = 0
+            if args.smooth2 > 0:
+                # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
+                sm_loss = (
+                    smoothness(
+                        left_view[:, :, :, int(0.20 * W) : :],
+                        ldisp[:, :, :, int(0.20 * W) : :],
+                        gamma=2,
+                        device=device,
+                    )
+                    + smoothness(
+                        right_view[:, :, :, 0 : int(0.80 * W)],
+                        rdisp[:, :, :, 0 : int(0.80 * W)],
+                        gamma=2,
+                        device=device,
+                    )
+                ) / 2
 
-        # compute gradient and do optimization step
-        loss = rec_loss + args.smooth2 * sm_loss + args.a_mr * mirror_loss
-        losses.update(loss.detach().cpu(), args.batch_size)
-        loss.backward()
-        g_optimizer.step()
+            # Compute mirror loss
+            mirror_loss = 0
+            if args.a_mr > 0:
+                # Normalize error ~ between 0-1, by diving over the max disparity value
+                nmaxl = 1 / F.max_pool2d(mldisp, kernel_size=(H, W))
+                nmaxr = 1 / F.max_pool2d(mrdisp, kernel_size=(H, W))
+                mirror_loss = (
+                    torch.mean(
+                        nmaxl
+                        * (1 - O_L)[:, :, :, int(0.20 * W) : :]
+                        * torch.abs(ldisp - mldisp)[:, :, :, int(0.20 * W) : :]
+                    )
+                    + torch.mean(
+                        nmaxr
+                        * (1 - O_R)[:, :, :, 0 : int(0.80 * W)]
+                        * torch.abs(rdisp - mrdisp)[:, :, :, 0 : int(0.80 * W)]
+                    )
+                ) / 2
+
+            # compute gradient and do optimization step
+            loss = rec_loss + args.smooth2 * sm_loss + args.a_mr * mirror_loss
+            losses.update(loss.detach().cpu(), args.batch_size)
+
+        scaler.scale(loss).backward()
+        scaler.step(g_optimizer)
+        scaler.update()
         g_optimizer.zero_grad()
 
         # measure elapsed time
@@ -428,7 +441,7 @@ def train(args, train_loader, model, fix_model, g_optimizer, epoch, device, vgg_
         if i >= epoch_size:
             break
 
-    return losses.avg
+    return loss, losses.avg
 
 
 def validate(args, val_loader, model, epoch, output_writers, device):
