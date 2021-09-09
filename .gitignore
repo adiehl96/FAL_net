@@ -5,7 +5,6 @@ Kitti_stage2/
 KITTI_stage2/
 test_KITTI/
 data/*
-!data/README.md 
 predict/
 temp/
 
