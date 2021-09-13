@@ -46,9 +46,8 @@ class ListDataset(data.Dataset):
     def __getitem__(self, index):
         input = self.path_list[index]
 
-        file_name = os.path.basename(input)[:-4]
         input = img_loader(input)
 
         if self.transform is not None:
             input = self.transform(input)
-        return [input], 0, file_name
+        return input

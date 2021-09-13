@@ -91,8 +91,8 @@ def predict(args, device="cpu"):
     right_shift = args.max_disp * args.rel_baset
 
     with torch.no_grad():
-        for i, (input, _, _) in enumerate(val_loader):
-            input_left = input[0].to(device)
+        for i, input in enumerate(val_loader):
+            input_left = input.to(device)
             B, C, H, W = input_left.shape
 
             # Prepare flip grid for post-processing

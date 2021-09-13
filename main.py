@@ -24,6 +24,7 @@ def main():
         "--dataset",
         metavar="Name of the Dataset to be used.",
         default="KITTI",
+        choices=["KITTI", "ASM_stereo_small"],
     )
 
     parser.add_argument(
@@ -169,7 +170,7 @@ def main():
         "--modus_operandi",
         default="test",
         help="Select the modus operandi.",
-        choices=["test", "predict", "train1", "train2"],
+        choices=["test", "predict", "train1", "train2", "retrain1"],
     )
     parser.add_argument(
         "--milestones1",
@@ -249,32 +250,7 @@ def main():
         help="path to the input image to be depth predicted",
     )
 
-    # parser.add_argument(
-    #     "--parser1", default="parser1", metavar="leeeeel", help="parser ident"
-    # )
-    args, _ = parser.parse_known_args()
-    # print("type(args)", type(args))
-
-    # print("args.parser1", args.parser1)
-
-    # parser2 = argparse.ArgumentParser(
-    #     description="lel",
-    #     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    # )
-
-    # parser2.add_argument(
-    #     "--parser2", default="parser2", metavar="leeeeel2", help="parser ident"
-    # )
-
-    # parser2.add_argument(
-    #     "--parser1", default="parser2biatch", metavar="leeeeel2", help="parser ident"
-    # )
-
-    # args2, _ = parser2.parse_known_args()
-    # print("args2.parser2", args2.parser2)
-    # print("args2.parser1", args2.parser1)
-
-    # sys.exit(os.EX_OK)
+    args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join(
         [str(item) for item in args.gpu_indices]
@@ -321,6 +297,7 @@ def main():
     from src.Train_Stage1_K import main as train1
     from src.Train_Stage2_K import main as train2
     from src.predict import predict
+    from src.retrain1_ASM import main as retrain1
 
     device = torch.device("cuda" if args.gpu_indices else "cpu")
 
@@ -332,6 +309,8 @@ def main():
         train2(args, device)
     elif args.modus_operandi == "predict":
         predict(args, device)
+    elif args.modus_operandi == "retrain1":
+        retrain1(args, device)
     elif args.modus_operandi == "full":
         train1(args, device)
         train2(args, device)

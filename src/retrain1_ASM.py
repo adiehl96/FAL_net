@@ -19,7 +19,7 @@ def main(args, device="cpu"):
     print("-------Training Stage 1 on " + str(device) + "-------")
     best_rec_loss = -1
 
-    save_path = os.path.join(args.dataset + "_stage1")
+    save_path = os.path.join(args.dataset + "_retrain1")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     _, sub_directories, _ = next(os.walk(save_path))
@@ -64,15 +64,12 @@ def main(args, device="cpu"):
     # Torch Data Set List
     input_path = os.path.join(args.data_directory, args.dataset)
     train_dataset0 = load_data(
-        split=args.train_split,
         dataset=args.dataset,
         root=input_path,
         transform=input_transform,
         co_transform=co_transform,
         max_pix=args.max_disp,
-        fix=True,
     )
-    input_path = os.path.join(args.data_directory, args.validation_dataset)
     print("len(train_dataset0)", len(train_dataset0))
 
     # Torch Data Loaders
