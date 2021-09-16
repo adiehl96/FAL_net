@@ -6,6 +6,27 @@ import torch.nn.functional as F
 import shutil
 import numpy as np
 import datetime
+from sklearn.metrics import mean_squared_log_error
+from skimage.metrics import (
+    normalized_root_mse,
+    mean_squared_error,
+    structural_similarity,
+)
+from image_similarity_measures.quality_metrics import (
+    fsim,
+    issm,
+    psnr,
+    rmse,
+    sam,
+    sre,
+    ssim,
+    uiq,
+)
+
+from skimage.util import img_as_ubyte
+from skimage.io import imsave
+import matplotlib.pyplot as plt
+import uuid
 
 a = datetime.timedelta(seconds=24)
 
@@ -248,6 +269,78 @@ def compute_kitti_errors(gt, pred, use_median=False, min_d=1.0, max_d=80.0):
     return errors
 
 
+def compute_asm_errors(gt, pred, min_d=1.0, max_d=80.0):
+    denormalize = np.array([0.411, 0.432, 0.45])
+    denormalize = denormalize[:, np.newaxis, np.newaxis]
+    gt = gt + denormalize
+    pred = pred + denormalize
+    gt[gt > 1] = 1
+    gt[gt < -1] = -1
+    pred[pred > 1] = 1
+    pred[pred < -1] = -1
+
+    gt = np.moveaxis(gt, 0, -1)
+    pred = np.moveaxis(pred, 0, -1)
+    print("gt.dtype, pred.dtype", gt.dtype, pred.dtype)
+    # gt = img_as_ubyte(gt)
+    # pred = img_as_ubyte(pred)
+    print("gt.shape ,pred.shape", gt.shape, pred.shape)
+    print("np.max(pred), np.min(pred)", np.max(pred), np.min(pred))
+    print("np.max(gt), np.min(gt)", np.max(gt), np.min(gt))
+
+    # mask = gt > 0
+    # gt = gt[mask]
+    # pred = pred[mask]
+
+    # pred[pred > max_d] = max_d
+    # pred[pred < min_d] = min_d
+    # gt[gt > max_d] = max_d
+    # gt[gt < min_d] = min_d
+    # gt = (gt - np.min(gt)) / (np.max(gt) - np.min(gt))
+    # pred = (pred - np.min(pred)) / (np.max(pred) - np.min(pred))
+
+    # gt += np.finfo(np.float32).eps
+    # pred += np.finfo(np.float32).eps
+    fst = gt / pred
+    print("any(fst.isinf()", np.any(np.isinf(fst)))
+    fst[fst == np.inf] = 0
+    print("any(fst.isinf()", np.any(np.isinf(fst)))
+    snd = pred / gt
+    print("any(snd.isinf()", np.any(np.isinf(snd)))
+    snd[snd == np.inf] = 0
+    print("any(snd.isinf()", np.any(np.isinf(snd)))
+    thresh = np.maximum(fst, snd)
+    a1 = (thresh < 1.25).mean()
+    a2 = (thresh < 1.25 ** 2).mean()
+    a3 = (thresh < 1.25 ** 3).mean()
+
+    gt = img_as_ubyte(gt)
+    pred = img_as_ubyte(pred)
+    print("plt.imshow(gt)")
+    uid = uuid.uuid4()
+    imsave(f"lel_3_{uid}.png", gt)
+    plt.show()
+
+    print("gt.dtype, pred.dtype", gt.dtype, pred.dtype)
+    print("gt.shape ,pred.shape", gt.shape, pred.shape)
+    print("np.max(pred), np.min(pred)", np.max(pred), np.min(pred))
+    print("np.max(gt), np.min(gt)", np.max(gt), np.min(gt))
+
+    rmse = np.sqrt(mean_squared_error(gt, pred))
+    nrmse = normalized_root_mse(gt, pred)
+
+    rmse_log = mean_squared_log_error(gt.flatten(), pred.flatten())
+    rmse_log = np.sqrt(rmse_log)
+
+    abs_rel = np.mean(np.abs(gt - pred) / gt)
+
+    sq_rel = np.mean(((gt - pred) ** 2) / gt)
+
+    errors = [abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3]
+
+    return errors
+
+
 def disps_to_depths_kitti2015(gt_disparities, pred_disparities):
     gt_depths = []
     pred_depths = []
@@ -256,7 +349,7 @@ def disps_to_depths_kitti2015(gt_disparities, pred_disparities):
         gt_disp = gt_disparities[i]
         pred_disp = pred_disparities[i]
 
-        height, width = gt_disp.shape
+        _height, width = gt_disp.shape
 
         gt_mask = gt_disp > 0
         pred_mask = pred_disp > 0
@@ -270,32 +363,31 @@ def disps_to_depths_kitti2015(gt_disparities, pred_disparities):
     return gt_depths, pred_depths
 
 
-def disps_to_depths_kitti(gt_disparities, pred_disparities):
-    gt_depths = []
+def disps_to_depths_kitti(gt_depths, pred_disparities):
+    gt_depths_processed = []
     pred_depths = []
 
-    for i in range(len(gt_disparities)):
-        gt_disp = gt_disparities[i]
+    for i in range(len(gt_depths)):
+        gt_depth = gt_depths[i]
         pred_disp = pred_disparities[i]
 
-        height, width = gt_disp.shape
-        gt_disp = gt_disp[height - 219 : height - 4, 44:1180]
+        height, width = gt_depth.shape
+        gt_depth = gt_depth[height - 219 : height - 4, 44:1180]
         pred_disp = pred_disp[height - 219 : height - 4, 44:1180]
 
-        gt_mask = gt_disp > 0
+        gt_mask = gt_depth > 0
         pred_mask = pred_disp > 0
 
-        gt_depth = gt_disp
         pred_depth = (
             width_to_focal[width]
             * width_to_baseline[width]
             / (pred_disp + (1.0 - pred_mask))
         )
 
-        gt_depths.append(gt_mask * gt_depth)
+        gt_depths_processed.append(gt_mask * gt_depth)
         pred_depths.append(pred_depth)
 
-    return gt_depths, pred_depths
+    return gt_depths_processed, pred_depths
 
 
 def disp_to_depth(pred_disparities):

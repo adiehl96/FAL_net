@@ -38,7 +38,7 @@ class Compose(object):
 class ArrayToTensor(object):
     def __call__(self, array):
         assert isinstance(array, np.ndarray)
-        if len(array.shape) == 3 and array.shape[-1] == 3:
+        if len(array.shape) == 3 and (array.shape[-1] == 3 or array.shape[-1] == 1):
             array = np.moveaxis(array, -1, 0)
         tensor = torch.from_numpy(array.copy())
         return tensor.float()

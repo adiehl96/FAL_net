@@ -12,7 +12,7 @@ from tensorboardX import SummaryWriter
 from torch.cuda.amp import GradScaler, autocast
 
 from misc import utils, data_transforms
-from misc.loss_functions import realEPE, smoothness, VGGLoss
+from misc.loss_functions import smoothness, VGGLoss
 
 
 def main(args, device="cpu"):
