@@ -19,6 +19,7 @@
 
 from __future__ import division
 import torch
+from torchvision.transforms import Normalize
 import random
 import numpy as np
 import numbers
@@ -162,3 +163,17 @@ class RandomCBrightness(object):
             return inputs, targets
         else:
             return inputs, targets
+
+
+class NormalizeInverse(Normalize):
+    """
+    Undoes the normalization and returns the reconstructed images in the input domain.
+    """
+
+    def __init__(self, mean, std):
+        mean = torch.as_tensor(mean)
+        std = torch.as_tensor(std)
+        std = std.eq(0).mul(1e-7).add(std)
+        std_inv = 1 / std
+        mean_inv = -mean * std_inv
+        super().__init__(mean=mean_inv, std=std_inv)

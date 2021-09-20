@@ -59,9 +59,14 @@ def main(args, device="cpu"):
         [
             data_transforms.ArrayToTensor(),
             transforms.Normalize(
-                mean=[0, 0, 0], std=[255, 255, 255]
-            ),  # (input - mean) / std
-            transforms.Normalize(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+                mean=[0.411 * 255, 0.432 * 255, 0.45 * 255], std=[255, 255, 255]
+            ),
+        ]
+    )
+    output_transforms = transforms.Compose(
+        [
+            data_transforms.NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+            transforms.ToPILImage(),
         ]
     )
 
@@ -113,13 +118,23 @@ def main(args, device="cpu"):
 
     print("len(val_loader)", len(val_loader))
     # evaluate on validation set
-    validate(args, val_loader, pan_model, save_path, model_parameters, device)
+    validate(
+        args,
+        val_loader,
+        pan_model,
+        save_path,
+        model_parameters,
+        device,
+        output_transforms,
+    )
 
 
-def validate(args, val_loader, pan_model, save_path, model_param, device):
+def validate(
+    args, val_loader, pan_model, save_path, model_param, device, output_transforms
+):
     batch_time = utils.AverageMeter()
     EPEs = utils.AverageMeter()
-    kitti_erros = utils.multiAverageMeter(utils.kitti_error_names)
+    asm_erros = utils.multiAverageMeter(utils.image_similarity_measures)
 
     l_disp_path = os.path.join(save_path, "l_disp")
     if not os.path.exists(l_disp_path):
@@ -134,8 +149,13 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
 
     with torch.no_grad():
         print("with torch.no_grad():")
-        for i, (input, _) in enumerate(val_loader):
-            print("input[0].shape, input[1].shape", input[0].shape, input[1].shape)
+        for i, complete in enumerate(val_loader):
+            print("len(complete)", len(complete))
+            print("len(complete[0])", len(complete[0]))
+            print("len(complete[0][0])", len(complete[0][0]))
+            input = complete[0]
+            # print(len(input))
+            # print("input[0].shape, input[1].shape", input[0].shape, input[1].shape)
             input_left = input[0].to(device)
             B, C, H, W = input_left.shape
 
@@ -209,19 +229,16 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                 )
                 im.save(os.path.join(input_path, "{:010d}.png".format(i)))
 
-            if args.evaluate:
-                # Record kitti metrics
-                target_im = input[1].squeeze(1).cpu().numpy()
-                pred_im = pan_im.squeeze(1).cpu().numpy()
-                for i in range(target_im.shape[0]):
-                    kitti_erros.update(
-                        utils.compute_asm_errors(target_im[i], pred_im[i]),
-                    )
+            for target_im, pred_im in zip(input[1], pan_im):
+                target_im = output_transforms(target_im)
+                pred_im = output_transforms(pred_im)
+                errors = utils.compute_asm_errors(target_im, pred_im)
+                asm_erros.update(errors)
 
             if i % args.print_freq == 0:
                 print(
-                    "Test: [{0}/{1}]\t Time {2}\t a1 {3:.4f}".format(
-                        i, len(val_loader), batch_time, kitti_erros.avg[4]
+                    "Test: [{0}/{1}]\t Time {2}\t SSIM {3:.4f}".format(
+                        i, len(val_loader), batch_time, asm_erros.avg[5]
                     )
                 )
 
@@ -229,11 +246,11 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
     with open(os.path.join(save_path, "errors.txt"), "w+") as f:
         f.write("\nNumber of parameters {}\n".format(model_param))
         f.write("\nEPE {}\n".format(EPEs.avg))
-        f.write("\nKitti metrics: \n{}\n".format(kitti_erros))
+        f.write("\nKitti metrics: \n{}\n".format(asm_erros))
 
     if args.evaluate:
         print("* EPE: {0}".format(EPEs.avg))
-        print(kitti_erros)
+        print(asm_erros)
 
 
 def ms_pp(input_view, pan_model, flip_grid, disp, min_disp, max_pix):
