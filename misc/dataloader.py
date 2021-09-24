@@ -123,14 +123,12 @@ def load_data(split=None, **kwargs):
             val_set = RetrainListDataset(
                 val_list,
                 transform=transform,
-                co_transform=co_transform,
                 max_pix=max_pix,
             )
 
             dataset = RetrainListDataset(
                 datasetlist,
                 transform=transform,
-                co_transform=co_transform,
                 max_pix=max_pix,
             )
             return dataset, val_set
@@ -138,14 +136,12 @@ def load_data(split=None, **kwargs):
             dataset = RetrainListDataset(
                 datasetlist,
                 transform=transform,
-                co_transform=co_transform,
                 max_pix=max_pix,
             )
     elif dataset == "ASM_stereo_small_test":
         dataset = RetrainListDataset(
             datasetlist,
             transform=transform,
-            co_transform=co_transform,
         )
 
     return dataset

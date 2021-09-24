@@ -16,11 +16,6 @@ from skimage.metrics import (
     variation_of_information,
 )
 
-from skimage.util import img_as_ubyte
-from skimage.io import imsave
-import matplotlib.pyplot as plt
-import uuid
-
 a = datetime.timedelta(seconds=24)
 
 

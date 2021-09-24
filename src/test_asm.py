@@ -55,19 +55,23 @@ def main(args, device="cpu"):
         os.makedirs(save_path)
     utils.display_config(args, save_path)
 
-    input_transform = transforms.Compose(
-        [
-            data_transforms.ArrayToTensor(),
-            transforms.Normalize(
-                mean=[0.411 * 255, 0.432 * 255, 0.45 * 255], std=[255, 255, 255]
-            ),
-        ]
+    input_transform = data_transforms.ApplyToMultiple(
+        transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+            ]
+        )
     )
-    output_transforms = transforms.Compose(
-        [
-            data_transforms.NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
-            transforms.ToPILImage(),
-        ]
+    output_transforms = data_transforms.ApplyToMultiple(
+        transforms.Compose(
+            [
+                data_transforms.NormalizeInverse(
+                    mean=[0.411, 0.432, 0.45], std=[1, 1, 1]
+                ),
+                transforms.ToPILImage(),
+            ]
+        )
     )
 
     # Torch Data Set List
@@ -149,14 +153,9 @@ def validate(
 
     with torch.no_grad():
         print("with torch.no_grad():")
-        for i, complete in enumerate(val_loader):
-            print("len(complete)", len(complete))
-            print("len(complete[0])", len(complete[0]))
-            print("len(complete[0][0])", len(complete[0][0]))
-            input = complete[0]
-            # print(len(input))
-            # print("input[0].shape, input[1].shape", input[0].shape, input[1].shape)
-            input_left = input[0].to(device)
+        for i, ([input_left, input_right], _max_pix) in enumerate(val_loader):
+
+            input_left = input_left.to(device)
             B, C, H, W = input_left.shape
 
             # Prepare flip grid for post-processing
@@ -229,9 +228,8 @@ def validate(
                 )
                 im.save(os.path.join(input_path, "{:010d}.png".format(i)))
 
-            for target_im, pred_im in zip(input[1], pan_im):
-                target_im = output_transforms(target_im)
-                pred_im = output_transforms(pred_im)
+            for target_im, pred_im in zip(input_right, pan_im):
+                [target_im, pred_im] = output_transforms([target_im, pred_im])
                 errors = utils.compute_asm_errors(target_im, pred_im)
                 asm_erros.update(errors)
 

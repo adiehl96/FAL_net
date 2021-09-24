@@ -17,12 +17,10 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-from __future__ import division
+import random, numbers
 import torch
-from torchvision.transforms import Normalize
-import random
+from torchvision import transforms
 import numpy as np
-import numbers
 from PIL import Image
 
 
@@ -165,7 +163,7 @@ class RandomCBrightness(object):
             return inputs, targets
 
 
-class NormalizeInverse(Normalize):
+class NormalizeInverse(transforms.Normalize):
     """
     Undoes the normalization and returns the reconstructed images in the input domain.
     """
@@ -177,3 +175,40 @@ class NormalizeInverse(Normalize):
         std_inv = 1 / std
         mean_inv = -mean * std_inv
         super().__init__(mean=mean_inv, std=std_inv)
+
+
+class ApplyToMultiple:
+    def __init__(
+        self,
+        transform,
+        same_rand_state=True,
+    ):
+        self.transform = transform
+        self.same_rand_state = same_rand_state
+
+    def _apply_to_features(self, transform, input, same_rand_state):
+        if same_rand_state:
+
+            # move randomness
+            np.random.rand()
+            random.random()
+            torch.rand(1)
+
+            # save state
+            np_state = np.random.get_state()
+            rd_state = random.getstate()
+            tr_state = torch.random.get_rng_state()
+
+        output = []
+        for item in input:
+            output.append(transform(item))
+
+            if same_rand_state:
+                np.random.set_state(np_state)
+                random.setstate(rd_state)
+                torch.set_rng_state(tr_state)
+
+        return output
+
+    def __call__(self, x):
+        return self._apply_to_features(self.transform, x, self.same_rand_state)
