@@ -152,9 +152,6 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
     if not os.path.exists(feats_path):
         os.makedirs(feats_path)
 
-    # Set the max disp
-    right_shift = args.max_disp * args.rel_baset
-
     with torch.no_grad():
         print("with torch.no_grad():")
         for i, (input, target, _) in enumerate(val_loader):

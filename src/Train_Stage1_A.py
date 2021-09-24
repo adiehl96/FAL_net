@@ -62,58 +62,39 @@ def main(args, device="cpu"):
         output_writers.append(SummaryWriter(os.path.join(save_path, "test", str(i))))
 
     # Set up data augmentations
-    co_transform = data_transforms.Compose(
-        [
-            data_transforms.RandomResizeCrop(
-                (args.crop_height, args.crop_width), down=0.75, up=1.5
-            ),
-            data_transforms.RandomHorizontalFlip(),
-            data_transforms.RandomGamma(min=0.8, max=1.2),
-            data_transforms.RandomBrightness(min=0.5, max=2.0),
-            data_transforms.RandomCBrightness(min=0.8, max=1.2),
-        ]
+    input_transform = data_transforms.ApplyToMultiple(
+        transforms.Compose(
+            [
+                transforms.RandomResizedCrop((args.crop_height, args.crop_width)),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(
+                    brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+            ]
+        )
     )
 
-    input_transform = transforms.Compose(
-        [
-            data_transforms.ArrayToTensor(),
-            transforms.Normalize(
-                mean=[0, 0, 0], std=[255, 255, 255]
-            ),  # (input - mean) / std
-            transforms.Normalize(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
-        ]
-    )
-
-    target_transform = transforms.Compose(
-        [
-            data_transforms.ArrayToTensor(),
-            transforms.Normalize(mean=[0], std=[1]),
-        ]
+    output_transforms = data_transforms.ApplyToMultiple(
+        transforms.Compose(
+            [
+                data_transforms.NormalizeInverse(
+                    mean=[0.411, 0.432, 0.45], std=[1, 1, 1]
+                ),
+                transforms.ToPILImage(),
+            ]
+        )
     )
 
     # Torch Data Set List
-    input_path = os.path.join(args.data_directory, args.dataset)
-    train_dataset0 = load_data(
-        split=args.train_split,
+    input_path = os.path.join(args.data_directory, "ASM_stereo")
+    train_dataset0, val_dataset0 = load_data(
         dataset=args.dataset,
         root=input_path,
         transform=input_transform,
-        target_transform=target_transform,
-        co_transform=co_transform,
         max_pix=args.max_disp,
-        fix=True,
-    )
-    input_path = os.path.join(args.data_directory, args.validation_dataset)
-    test_dataset = load_data(
-        split=args.validation_split,
-        dataset=args.validation_dataset,
-        root=input_path,
-        disp=True,
-        of=False,
-        shuffle_test=False,
-        transform=input_transform,
-        target_transform=target_transform,
-        co_transform=co_transform,
+        create_val=0.1,
     )
     print("len(train_dataset0)", len(train_dataset0))
 
@@ -126,7 +107,7 @@ def main(args, device="cpu"):
         shuffle=True,
     )
     val_loader = torch.utils.data.DataLoader(
-        test_dataset,
+        val_dataset0,
         batch_size=args.tbatch_size,
         num_workers=args.workers,
         pin_memory=False,
@@ -177,7 +158,7 @@ def main(args, device="cpu"):
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
         # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-        rmse = validate(args, val_loader, model, epoch, output_writers, device)
+        rmse = validate(args, val_loader, model, device, output_transforms)
         test_writer.add_scalar("mean RMSE", rmse, epoch)
 
         # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
@@ -217,11 +198,13 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
     model.train()
 
     end = time.time()
-    for i, input_data0 in enumerate(train_loader):
+    for i, ([input_left, input_right], max_pix) in enumerate(train_loader):
         # Read training data
-        left_view = input_data0[0][0].to(device)
-        right_view = input_data0[0][1].to(device)
-        max_disp = input_data0[1].unsqueeze(1).unsqueeze(1).type(left_view.type())
+        left_view = input_left.to(device)
+        right_view = input_right.to(device)
+        # max_disp = max_pix.unsqueeze(1).unsqueeze(1).type(left_view.type())
+        min_disp = torch.tensor([args.min_disp]).to(device)
+        max_disp = torch.tensor([max_pix[0]]).to(device)
         _, _, _, W = left_view.shape
 
         # measure data loading time
@@ -293,100 +276,53 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
     return loss, losses.avg
 
 
-def validate(args, val_loader, model, epoch, output_writers, device):
+def validate(args, val_loader, model, device, output_transforms):
+    batch_time = utils.AverageMeter()
+    asm_erros = utils.multiAverageMeter(utils.image_similarity_measures)
 
-    test_time = utils.AverageMeter()
-    RMSES = utils.AverageMeter()
-    EPEs = utils.AverageMeter()
-    kitti_erros = utils.multiAverageMeter(utils.kitti_error_names)
+    # Set the max disp
+    right_shift = args.max_disp * args.rel_baset
 
-    # switch to evaluate mode
-    model.eval()
-
-    # Disable gradients to save memory
     with torch.no_grad():
-        for i, input_data in enumerate(val_loader):
-            input_left = input_data[0][0].to(device)
-            input_right = input_data[0][1].to(device)
-            target = input_data[1][0].to(device)
+        print("with torch.no_grad():")
+        for i, ([input_left, input_right], _max_pix) in enumerate(val_loader):
+
+            input_left = input_left.to(device)
+
+            # Convert min and max disp to bx1x1 tensors
             max_disp = (
-                torch.Tensor([args.max_disp * args.rel_baset])
+                torch.Tensor([right_shift])
                 .unsqueeze(1)
                 .unsqueeze(1)
                 .type(input_left.type())
             )
-
-            # Prepare input data
-            end = time.time()
             min_disp = max_disp * args.min_disp / args.max_disp
-            p_im, disp, maskL, maskRL = model(
+
+            # Synthesis
+            end = time.time()
+
+            pan_im, _disp = model(
                 input_left=input_left,
                 min_disp=min_disp,
                 max_disp=max_disp,
                 ret_disp=True,
+                ret_subocc=False,
                 ret_pan=True,
-                ret_subocc=True,
-            )
-            test_time.update(time.time() - end)
-
-            # Measure RMSE
-            rmse = utils.get_rmse(p_im, input_right, device=device)
-            RMSES.update(rmse)
-
-            # record EPE
-            flow2_EPE = realEPE(disp, target, sparse=args.sparse)
-            EPEs.update(flow2_EPE.detach(), target.size(0))
-
-            # Record kitti metrics
-            target_depth, pred_depth = utils.disps_to_depths_kitti2015(
-                target.detach().squeeze(1).cpu().numpy(),
-                disp.detach().squeeze(1).cpu().numpy(),
-            )
-            kitti_erros.update(
-                utils.compute_kitti_errors(target_depth[0], pred_depth[0]),
-                target.size(0),
             )
 
-            denormalize = np.array([0.411, 0.432, 0.45])
-            denormalize = denormalize[:, np.newaxis, np.newaxis]
+            # measure elapsed time
+            batch_time.update(time.time() - end, 1)
 
-            if i < len(output_writers):  # log first output of first batches
-                if epoch == 0:
-                    output_writers[i].add_image(
-                        "Input left", input_left[0].cpu().numpy() + denormalize, 0
-                    )
-
-                # Plot disp
-                output_writers[i].add_image(
-                    "Left disparity", utils.disp2rgb(disp[0].cpu().numpy(), None), epoch
-                )
-
-                # Plot left subocclsion mask (even if it is not used during training)
-                output_writers[i].add_image(
-                    "Left sub-occ", utils.disp2rgb(maskL[0].cpu().numpy(), None), epoch
-                )
-
-                # Plot right-from-left subocclsion mask (even if it is not used during training)
-                output_writers[i].add_image(
-                    "RightL sub-occ",
-                    utils.disp2rgb(maskRL[0].cpu().numpy(), None),
-                    epoch,
-                )
-
-                # Plot synthetic right (or panned) view output
-                p_im = p_im[0].detach().cpu().numpy() + denormalize
-                p_im[p_im > 1] = 1
-                p_im[p_im < 0] = 0
-                output_writers[i].add_image("Output Pan", p_im, epoch)
+            for target_im, pred_im in zip(input_right, pan_im):
+                [target_im, pred_im] = output_transforms([target_im, pred_im])
+                errors = utils.compute_asm_errors(target_im, pred_im)
+                asm_erros.update(errors)
 
             if i % args.print_freq == 0:
                 print(
-                    "Test: [{0}/{1}]\t Time {2}\t RMSE {3}".format(
-                        i, len(val_loader), test_time, RMSES
+                    "Test: [{0}/{1}]\t Time {2}\t SSIM {3:.4f}".format(
+                        i, len(val_loader), batch_time, asm_erros.avg[5]
                     )
                 )
-
-    print("* RMSE {0}".format(RMSES.avg))
-    print(" * EPE {:.3f}".format(EPEs.avg))
-    print(kitti_erros)
-    return RMSES.avg
+    print(asm_erros)
+    return asm_erros.avg[3]

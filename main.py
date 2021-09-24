@@ -24,7 +24,7 @@ def main():
         "--dataset",
         metavar="Name of the Dataset to be used.",
         default="KITTI",
-        choices=["KITTI", "ASM_stereo_small_test"],
+        choices=["KITTI", "ASM_stereo_small_test", "ASM_stereo_train"],
     )
 
     parser.add_argument(
@@ -75,7 +75,7 @@ def main():
         help="Beta parameter for adam",
         default=0.999,
     )
-    parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=640)
+    parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=320)
     parser.add_argument("-save", "--save", action="store_true", default=False)
     parser.add_argument("--lr1", metavar="Initial Learning Rate Train1", default=0.0001)
     parser.add_argument(
@@ -92,7 +92,7 @@ def main():
     )
 
     parser.add_argument(
-        "-ch", "--crop_height", metavar="Batch crop H Size", default=192
+        "-ch", "--crop_height", metavar="Batch crop H Size", default=320
     )
     parser.add_argument(
         "-save_input", "--save_input", action="store_true", default=False
@@ -170,7 +170,7 @@ def main():
         "--modus_operandi",
         default="test",
         help="Select the modus operandi.",
-        choices=["test", "predict", "train1", "train2", "retrain1"],
+        choices=["test", "predict", "train1", "train1asm", "train2", "retrain1"],
     )
     parser.add_argument(
         "--milestones1",
@@ -299,6 +299,7 @@ def main():
     from src.Train_Stage2_K import main as train2
     from src.predict import predict
     from src.retrain1_ASM import main as retrain1
+    from src.Train_Stage1_A import main as train1asm
 
     device = torch.device("cuda" if args.gpu_indices else "cpu")
 
@@ -309,6 +310,8 @@ def main():
             test_asm(args, device)
     elif args.modus_operandi == "train1":
         train1(args, device)
+    elif args.modus_operandi == "train1asm":
+        train1asm(args, device)
     elif args.modus_operandi == "train2":
         train2(args, device)
     elif args.modus_operandi == "predict":

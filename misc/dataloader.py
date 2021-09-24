@@ -35,6 +35,10 @@ def load_data(split=None, **kwargs):
     elif dataset == "ASM_stereo_small_test":
         with open(f"{input_root}/{dataset}", "rb") as fp:
             datasetlist = pickle.load(fp)
+    elif dataset == "ASM_stereo_train":
+        with open(f"{input_root}/{dataset}", "rb") as fp:
+            datasetlist = pickle.load(fp)
+
     elif split is not None:
         try:
             datasetfile = open(splitfilelocation)
@@ -113,7 +117,7 @@ def load_data(split=None, **kwargs):
             transform=transform,
             target_transform=target_transform,
         )
-    elif dataset == "ASM_stereo_small_train":
+    elif dataset == "ASM_stereo_small_train" or dataset == "ASM_stereo_train":
         if create_val:
             np.random.default_rng().shuffle(datasetlist, axis=0)
             val_size = int(len(datasetlist) * create_val)
