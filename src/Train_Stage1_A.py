@@ -65,7 +65,11 @@ def main(args, device="cpu"):
     input_transform = data_transforms.ApplyToMultiple(
         transforms.Compose(
             [
-                transforms.RandomResizedCrop((args.crop_height, args.crop_width)),
+                transforms.RandomResizedCrop(
+                    size=(args.crop_height, args.crop_width),
+                    scale=(0.10, 1.0),
+                    ratio=(1, 1),
+                ),
                 transforms.RandomHorizontalFlip(),
                 transforms.ColorJitter(
                     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2
@@ -140,12 +144,12 @@ def main(args, device="cpu"):
         g_optimizer = torch.optim.Adam(
             params=param_groups, lr=args.lr1, betas=(args.momentum, args.beta)
         )
-    g_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        g_optimizer, milestones=args.milestones1, gamma=0.5
-    )
+    # g_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+    #     g_optimizer, milestones=args.milestones1, gamma=0.5
+    # )
 
-    for epoch in range(args.start_epoch):
-        g_scheduler.step()
+    # for epoch in range(args.start_epoch):
+    #     g_scheduler.step()
 
     vgg_loss = VGGLoss(device=device)
     scaler = GradScaler()
@@ -157,29 +161,30 @@ def main(args, device="cpu"):
         )
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
-        # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-        rmse = validate(args, val_loader, model, device, output_transforms)
-        test_writer.add_scalar("mean RMSE", rmse, epoch)
+        if epoch % args.val_freq == 0 or epoch + 1 == args.epochs1:
+            # evaluate on validation set, RMSE is from stereoscopic view synthesis task
+            rmse = validate(args, val_loader, model, device, output_transforms)
+            test_writer.add_scalar("mean RMSE", rmse, epoch)
 
-        # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
-        g_scheduler.step()
+            # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
+            # g_scheduler.step()
 
-        if best_rmse < 0:
-            best_rmse = rmse
-        is_best = rmse < best_rmse
-        best_rmse = min(rmse, best_rmse)
-        utils.save_checkpoint(
-            {
-                "epoch": epoch,
-                "model_state_dict": model.module.state_dict()
-                if isinstance(model, torch.nn.DataParallel)
-                else model.state_dict(),
-                "optimizer_state_dict": g_optimizer.state_dict(),
-                "loss": loss,
-            },
-            is_best,
-            save_path,
-        )
+            if best_rmse < 0:
+                best_rmse = rmse
+            is_best = rmse < best_rmse
+            best_rmse = min(rmse, best_rmse)
+            utils.save_checkpoint(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.module.state_dict()
+                    if isinstance(model, torch.nn.DataParallel)
+                    else model.state_dict(),
+                    "optimizer_state_dict": g_optimizer.state_dict(),
+                    "loss": loss,
+                },
+                is_best,
+                save_path,
+            )
 
 
 def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scaler):
@@ -261,7 +266,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
+        if i == epoch_size or i % args.print_freq == 0 and not i == 0:
             eta = utils.eta_calculator(
                 batch_time.get_avg(), epoch_size, args.epochs1 - epoch, i
             )
@@ -318,11 +323,5 @@ def validate(args, val_loader, model, device, output_transforms):
                 errors = utils.compute_asm_errors(target_im, pred_im)
                 asm_erros.update(errors)
 
-            if i % args.print_freq == 0:
-                print(
-                    "Test: [{0}/{1}]\t Time {2}\t SSIM {3:.4f}".format(
-                        i, len(val_loader), batch_time, asm_erros.avg[5]
-                    )
-                )
     print(asm_erros)
     return asm_erros.avg[3]

@@ -77,7 +77,9 @@ def main():
     )
     parser.add_argument("-cw", "--crop_width", metavar="Batch crop W Size", default=320)
     parser.add_argument("-save", "--save", action="store_true", default=False)
-    parser.add_argument("--lr1", metavar="Initial Learning Rate Train1", default=0.0001)
+    parser.add_argument(
+        "--lr1", type=float, metavar="Initial Learning Rate Train1", default=0.0001
+    )
     parser.add_argument(
         "--lr2", metavar="Initial Learning Rate Train2", default=0.00005
     )
@@ -224,6 +226,14 @@ def main():
         type=int,
         metavar="N",
         help="manual epoch number (useful on restarts)",
+    )
+
+    parser.add_argument(
+        "--val_freq",
+        default=0,
+        type=int,
+        metavar="N",
+        help="validation frequency",
     )
 
     parser.add_argument(
