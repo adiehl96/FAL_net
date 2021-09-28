@@ -266,7 +266,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i == epoch_size or i % args.print_freq == 0 and not i == 0:
+        if i == epoch_size - 1 or i % args.print_freq == 0 and not i == 0:
             eta = utils.eta_calculator(
                 batch_time.get_avg(), epoch_size, args.epochs1 - epoch, i
             )
