@@ -152,12 +152,6 @@ def main(args, device="cpu"):
         g_optimizer = torch.optim.Adam(
             params=param_groups, lr=args.lr1, betas=(args.momentum, args.beta)
         )
-    # g_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-    #     g_optimizer, milestones=args.milestones1, gamma=0.5
-    # )
-
-    # for epoch in range(args.start_epoch):
-    #     g_scheduler.step()
 
     vgg_loss = VGGLoss(device=device)
     scaler = GradScaler()

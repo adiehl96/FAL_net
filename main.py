@@ -24,7 +24,12 @@ def main():
         "--dataset",
         metavar="Name of the Dataset to be used.",
         default="KITTI",
-        choices=["KITTI", "ASM_stereo_small_test", "ASM_stereo_train"],
+        choices=[
+            "KITTI",
+            "ASM_stereo_small_test",
+            "ASM_stereo_train",
+            "ASM_stereo_test",
+        ],
     )
 
     parser.add_argument(

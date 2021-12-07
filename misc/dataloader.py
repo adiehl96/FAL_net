@@ -38,7 +38,9 @@ def load_data(split=None, **kwargs):
     elif dataset == "ASM_stereo_train":
         with open(f"{input_root}/{dataset}", "rb") as fp:
             datasetlist = pickle.load(fp)
-
+    elif dataset == "ASM_stereo_test":
+        with open(f"{input_root}/{dataset}", "rb") as fp:
+            datasetlist = pickle.load(fp)
     elif split is not None:
         try:
             datasetfile = open(splitfilelocation)
@@ -142,7 +144,7 @@ def load_data(split=None, **kwargs):
                 transform=transform,
                 max_pix=max_pix,
             )
-    elif dataset == "ASM_stereo_small_test":
+    elif dataset == "ASM_stereo_small_test" or dataset == "ASM_stereo_test":
         dataset = RetrainListDataset(
             datasetlist,
             transform=transform,
