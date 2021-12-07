@@ -233,6 +233,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
         with autocast():
             ###### LEFT disp
             min_disp = max_disp * args.min_disp / args.max_disp
+
             rpan, ldisp = model(
                 input_left=left_view,
                 min_disp=min_disp,
@@ -241,6 +242,10 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
                 ret_pan=True,
                 ret_subocc=False,
             )
+            print("left_view.shape", left_view.shape)
+            print("rpan.shape", rpan.shape)
+            print("right_view.shape", right_view.shape)
+
             # Compute rec loss
 
             if args.a_p > 0:

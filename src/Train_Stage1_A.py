@@ -126,17 +126,25 @@ def main(args, device="cpu"):
         checkpoint = torch.load(args.pretrained, map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
 
-    if device.type == "cuda":
+    if torch.cuda.device_count() > 1:
         print("torch.nn.DataParallel(model).to(device)")
-        model = torch.nn.DataParallel(model).to(device)
+        model = torch.nn.DataParallel(model)
+    model.to(device)
     print("=> Number of parameters model '{}'".format(utils.get_n_params(model)))
 
     # Optimizer Settings
     print("Setting {} Optimizer".format(args.optimizer))
     param_groups = [
-        {"params": model.module.bias_parameters(), "weight_decay": args.bias_decay},
         {
-            "params": model.module.weight_parameters(),
+            "params": model.module.bias_parameters()
+            if isinstance(model, torch.nn.DataParallel)
+            else model.bias_parameters(),
+            "weight_decay": args.bias_decay,
+        },
+        {
+            "params": model.module.weight_parameters()
+            if isinstance(model, torch.nn.DataParallel)
+            else model.weight_parameters(),
             "weight_decay": args.weight_decay,
         },
     ]
@@ -208,8 +216,9 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
         left_view = input_left.to(device)
         right_view = input_right.to(device)
         # max_disp = max_pix.unsqueeze(1).unsqueeze(1).type(left_view.type())
-        min_disp = torch.tensor([args.min_disp]).to(device)
-        max_disp = torch.tensor([max_pix[0]]).to(device)
+        # min_disp = torch.tensor([args.min_disp]).to(device)
+        # max_disp = max_pix.to(device)
+        max_disp = max_pix.unsqueeze(1).unsqueeze(1).type(left_view.type())
         _, _, _, W = left_view.shape
 
         # measure data loading time
