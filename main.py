@@ -11,6 +11,7 @@ def main():
         description="FAL_net in pytorch",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+
     parser.add_argument(
         "-dd",
         "--data_directory",
@@ -101,9 +102,7 @@ def main():
     parser.add_argument(
         "-ch", "--crop_height", metavar="Batch crop H Size", default=320
     )
-    parser.add_argument(
-        "-save_input", "--save_input", action="store_true", default=False
-    )
+    parser.add_argument("-si", "--save_input", action="store_true", default=False)
     parser.add_argument("-w", "--workers", metavar="Workers", default=4, type=int)
     parser.add_argument(
         "--sparse",
@@ -258,14 +257,7 @@ def main():
         "--bias-decay", default=0.0, type=float, metavar="B", help="bias decay"
     )
 
-    parser.add_argument(
-        "--input",
-        dest="input",
-        default="./test.png",
-        help="path to the input image to be depth predicted",
-    )
-
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ", ".join(
         [str(item) for item in args.gpu_indices]
@@ -330,13 +322,9 @@ def main():
     elif args.modus_operandi == "train2":
         train2(args, device)
     elif args.modus_operandi == "predict":
-        predict(args, device)
+        predict(parser, device)
     elif args.modus_operandi == "retrain1":
         retrain1(args, device)
-    elif args.modus_operandi == "full":
-        train1(args, device)
-        train2(args, device)
-        test_kitti(args, device)
     else:
         raise Exception(f"{args.modus_operandi} is not a valid modus operandi.")
 

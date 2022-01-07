@@ -11,6 +11,8 @@ data/*
 predict/
 temp/
 test/
+eigen/
+reference/
 
 
 # Mac Specific

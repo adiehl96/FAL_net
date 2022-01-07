@@ -58,7 +58,7 @@ def main(args, device="cpu"):
     input_transform = data_transforms.ApplyToMultiple(
         transforms.Compose(
             [
-                # transforms.Resize(size=(args.crop_height, args.crop_width)),
+                transforms.Resize(size=(args.crop_height, args.crop_width)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
             ]

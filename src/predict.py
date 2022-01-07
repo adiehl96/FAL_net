@@ -1,4 +1,4 @@
-import os
+import os, pickle
 
 import numpy as np
 
@@ -15,37 +15,58 @@ from models.FAL_netB import FAL_netB
 from misc import utils, data_transforms
 
 
-def predict(args, device="cpu"):
+def predict(parser, device="cpu"):
     print("-------Predicting on " + str(device) + "-------")
 
-    if args.model.isdigit():
-        save_path = os.path.join("predict", args.model.zfill(10))
-    else:
-        model_number = args.model.split("/")[-2].zfill(10)
-        save_path = os.path.join("predict", model_number)
-    if args.f_post_process:
-        save_path = save_path + "fpp"
-    if args.ms_post_process:
-        save_path = save_path + "mspp"
-    print("=> Saving to {}".format(save_path))
+    parser.add_argument(
+        "-sp", "--save_path", help="Path that outputs will be saved to", required=True
+    )
 
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    utils.display_config(args, save_path)
+    parser.add_argument(
+        "-mp", "--model_path", help="Path that model will be loaded from", required=True
+    )
+
+    parser.add_argument(
+        "--input",
+        dest="input",
+        default="./data/test.png",
+        help="path to the input image to be depth predicted",
+        required=True,
+    )
+
+    parser.add_argument(
+        "-pickle", "--pickle_predictions", action="store_true", default=False
+    )
+
+    args = parser.parse_args()
+
+    print("=> Saving to {}".format(args.save_path))
+
+    if not os.path.exists(args.save_path):
+        os.makedirs(args.save_path, exist_ok=True)
+    utils.display_config(args, args.save_path)
 
     input_transform = transforms.Compose(
         [
-            data_transforms.ArrayToTensor(),
-            transforms.Normalize(
-                mean=[0, 0, 0], std=[255, 255, 255]
-            ),  # (input - mean) / std
+            transforms.ToTensor(),
             transforms.Normalize(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+        ]
+    )
+
+    output_transform = transforms.Compose(
+        [
+            data_transforms.NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+            transforms.ToPILImage(),
         ]
     )
 
     # Torch Data Set List
     predict_dataset = RunListDataset(
-        path_list=[args.input],
+        path_list=[args.input]
+        if os.path.isfile(args.input)
+        else [
+            os.path.join(args.input, x) for x in sorted(next(os.walk(args.input))[2])
+        ],
         transform=input_transform,
     )
 
@@ -59,22 +80,10 @@ def predict(args, device="cpu"):
         shuffle=False,
     )
 
-    # create pan model
-    if args.model.isdigit():
-        model_path = os.path.join(
-            args.dataset + "_stage2", args.model.zfill(10), "model_best.pth.tar"
-        )
-        if not os.path.exists(model_path):
-            model_path = os.path.join(
-                args.dataset + "_stage2", args.model.zfill(10), "checkpoint.pth.tar"
-            )
-    else:
-        model_path = args.model
-
-    print(model_path)
+    print(args.model_path)
 
     pan_model = FAL_netB(no_levels=args.no_levels, device=device)
-    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint = torch.load(args.model_path, map_location=device)
     pan_model.load_state_dict(checkpoint["model_state_dict"])
     if device.type == "cuda":
         pan_model = torch.nn.DataParallel(pan_model).to(device)
@@ -83,9 +92,19 @@ def predict(args, device="cpu"):
     print("=> Number of parameters '{}'".format(model_parameters))
     cudnn.benchmark = True
 
-    l_disp_path = os.path.join(save_path, "l_disp")
+    l_disp_path = os.path.join(args.save_path, "l_disp")
     if not os.path.exists(l_disp_path):
         os.makedirs(l_disp_path)
+
+    input_path = os.path.join(args.save_path, "input")
+    if args.save_input and not os.path.exists(input_path):
+        os.makedirs(input_path, exist_ok=True)
+
+    pickle_path = os.path.join(args.save_path, "pickle")
+    if args.pickle_predictions and not os.path.exists(pickle_path):
+        os.makedirs(pickle_path, exist_ok=True)
+    if args.pickle_predictions:
+        predicte_disparities = []
 
     # Set the max disp
     right_shift = args.max_disp * args.rel_baset
@@ -133,6 +152,20 @@ def predict(args, device="cpu"):
                 cmap="inferno",
                 vmin=0,
                 vmax=256,
+            )
+
+            if args.save_input:
+                print("save the input image in path", input_path)
+                input_image = output_transform(input[0])
+                input_image.save(os.path.join(input_path, "{:010d}.png".format(i)))
+
+            if args.pickle_predictions:
+                predicte_disparities.append(disp.squeeze().cpu().numpy())
+
+        if args.pickle_predictions:
+            pickle.dump(
+                predicte_disparities,
+                open(os.path.join(pickle_path, "predictions.pickle"), "wb"),
             )
 
 

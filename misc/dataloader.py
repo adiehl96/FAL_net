@@ -1,4 +1,5 @@
 import os.path, csv, pickle
+from shutil import copy
 from misc.listdataset_test import ListDataset as TestListDataset
 from misc.listdataset_train import ListDataset as TrainListDataset
 from misc.listdataset_retrain import ListDataset as RetrainListDataset
@@ -24,6 +25,8 @@ def load_data(split=None, **kwargs):
 
     if split == "eigen_test_improved" and dataset == "KITTI":
         splitfilelocation = "./splits/KITTI/eigen_test_improved.txt"
+    elif split == "eigen_test_classic" and dataset == "KITTI":
+        splitfilelocation = "./splits/KITTI/eigen_test_classic.txt"
     elif split == "eigen_train" and dataset == "KITTI":
         splitfilelocation = "./splits/KITTI/eigen_train.txt"
     elif split == "bello_val" and dataset == "KITTI2015":
@@ -49,13 +52,33 @@ def load_data(split=None, **kwargs):
 
         datasetreader = csv.reader(datasetfile, delimiter=",")
         datasetlist = []
-        for row in datasetreader:
+        for i, row in enumerate(datasetreader):
             if split == "eigen_test_improved" and dataset == "KITTI":
                 inputleft = f"{input_root}{row[0]}"
                 inputright = f"{input_root}{row[1]}"
                 groundtruthleft = f"{input_root}{row[2]}"
                 velodyneleft = f"{input_root}{row[3]}"
                 files = [[inputleft, inputright], [groundtruthleft, velodyneleft]]
+
+            if split == "eigen_test_classic" and dataset == "KITTI":
+                print()
+                info = row[0].split(" ")
+                inputleft = f"/{info[0].split('/')[1]}/image_02/data/{info[1]}.png"
+                # inputright = f"/{info[0].split('/')[1]}/image_03/data/{info[1]}.png"
+                # groundtruthleft = f"/{info[0].split('/')[1]}/proj_depth/groundtruth/image_02/{info[1]}.png"
+                # velodyneleft = f"/{info[0].split('/')[1]}/proj_depth/velodyne_raw/image_02/{info[1]}.png"
+                # print(",".join([inputleft, inputright, groundtruthleft, velodyneleft]))
+                inputleft = f"{input_root}{inputleft}"
+                # inputright = f"{input_root}{inputright}"
+                # groundtruthleft = f"{input_root}{groundtruthleft}"
+                # velodyneleft = f"{input_root}{velodyneleft}"
+
+                # inputleft = f"{input_root}{row[0]}"
+                # inputright = f"{input_root}{row[1]}"
+                # groundtruthleft = f"{input_root}{row[2]}"
+                # velodyneleft = f"{input_root}{row[3]}"
+                files = [inputleft]
+                copy(inputleft, os.path.join(os.getcwd(), "{:010d}.png".format(i)))
 
             elif split == "eigen_train" and dataset == "KITTI":
                 inputleft = f"{input_root}{row[0]}"

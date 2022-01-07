@@ -18,15 +18,13 @@
 
 # import torch.utils.data as data
 from torch.utils import data
-import os
-import os.path
 from imageio import imread
 
 LR_DATASETS = ["Kitti_eigen_test_improved"]
 
 
 def img_loader(path_img):
-    print("path_img", path_img)
+    # print("path_img", path_img)
     img = imread(path_img)
     return img
 
