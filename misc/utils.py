@@ -60,8 +60,9 @@ def display_config(args, save_path):
         settings = settings + "%18s: %s\n" % (str(arg), str(getattr(args, arg)))
     print(settings)
     # Save config in txt file
-    with open(os.path.join(save_path, "settings.txt"), "w+") as f:
-        f.write(settings)
+    if save_path:
+        with open(os.path.join(save_path, "settings.txt"), "w+") as f:
+            f.write(settings)
 
 
 def save_checkpoint(state, is_best, save_path, filename="checkpoint.pth.tar"):

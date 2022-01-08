@@ -1,8 +1,9 @@
 import os.path, csv, pickle
-from shutil import copy
 from misc.listdataset_test import ListDataset as TestListDataset
 from misc.listdataset_train import ListDataset as TrainListDataset
 from misc.listdataset_retrain import ListDataset as RetrainListDataset
+from misc.listdataset_run import ListDataset as EigentestListDataset
+
 
 from random import shuffle
 from misc.utils import flatten
@@ -61,24 +62,10 @@ def load_data(split=None, **kwargs):
                 files = [[inputleft, inputright], [groundtruthleft, velodyneleft]]
 
             if split == "eigen_test_classic" and dataset == "KITTI":
-                print()
                 info = row[0].split(" ")
                 inputleft = f"/{info[0].split('/')[1]}/image_02/data/{info[1]}.png"
-                # inputright = f"/{info[0].split('/')[1]}/image_03/data/{info[1]}.png"
-                # groundtruthleft = f"/{info[0].split('/')[1]}/proj_depth/groundtruth/image_02/{info[1]}.png"
-                # velodyneleft = f"/{info[0].split('/')[1]}/proj_depth/velodyne_raw/image_02/{info[1]}.png"
-                # print(",".join([inputleft, inputright, groundtruthleft, velodyneleft]))
                 inputleft = f"{input_root}{inputleft}"
-                # inputright = f"{input_root}{inputright}"
-                # groundtruthleft = f"{input_root}{groundtruthleft}"
-                # velodyneleft = f"{input_root}{velodyneleft}"
-
-                # inputleft = f"{input_root}{row[0]}"
-                # inputright = f"{input_root}{row[1]}"
-                # groundtruthleft = f"{input_root}{row[2]}"
-                # velodyneleft = f"{input_root}{row[3]}"
                 files = [inputleft]
-                copy(inputleft, os.path.join(os.getcwd(), "{:010d}.png".format(i)))
 
             elif split == "eigen_train" and dataset == "KITTI":
                 inputleft = f"{input_root}{row[0]}"
@@ -120,6 +107,12 @@ def load_data(split=None, **kwargs):
             transform=transform,
             target_transform=target_transform,
         )
+    if split == "eigen_test_classic" and dataset == "KITTI":
+        dataset = EigentestListDataset(
+            path_list=flatten(datasetlist),
+            transform=transform,
+        )
+
     elif split == "eigen_train" and dataset == "KITTI":
         dataset = TrainListDataset(
             input_root,

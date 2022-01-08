@@ -45,6 +45,10 @@ def main():
         "--test_split",
         metavar="Name of the test split of the data to be loaded from the dataset.",
         default="eigen_test_improved",
+        choices=[
+            "eigen_test_improved",
+            "eigen_test_classic",
+        ],
     )
 
     parser.add_argument(
@@ -301,6 +305,7 @@ def main():
     import torch
 
     from src.Test_KITTI import main as test_kitti
+    from src.test_eigen_classic import main as test_eigen_classic
     from src.test_asm import main as test_asm
     from src.Train_Stage1_K import main as train1
     from src.Train_Stage2_K import main as train2
@@ -311,9 +316,11 @@ def main():
     device = torch.device("cuda" if args.gpu_indices else "cpu")
 
     if args.modus_operandi == "test":
-        if "KITTI" in args.dataset:
+        if args.test_split == "eigen_test_classic":
+            test_eigen_classic(parser, device)
+        elif "KITTI" in args.dataset:
             test_kitti(args, device)
-        if "ASM" in args.dataset:
+        elif "ASM" in args.dataset:
             test_asm(args, device)
     elif args.modus_operandi == "train1":
         train1(args, device)

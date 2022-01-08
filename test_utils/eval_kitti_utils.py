@@ -27,14 +27,13 @@ def read_file_data(files, data_root):
     cams = []
     num_probs = 0
     for filename in files:
-        filename = filename.split()[0]
-        splits = filename.split("/")
-        date = splits[0]
-        im_id = splits[4][:10]
+        splits = filename.split()
+        date = filename.split("/")[0]
+        im_id = splits[1]
+        data_path = splits[0].split("/")[1]
 
-        im = filename
-        im = "/".join(splits[1:-1]) + f"/{im_id}.png"
-        vel = "{}/velodyne_points/data/{}.bin".format(splits[1], im_id)
+        im = data_path + f"/image_02/data/{im_id}.png"
+        vel = f"{data_path}/velodyne_points/data/{im_id}.bin"
 
         if os.path.isfile(os.path.join(data_root, im)):
             gt_files.append(os.path.join(data_root, vel))

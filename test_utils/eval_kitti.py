@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
-import argparse, os
-from godard import (
+import os.path as path
+from test_utils.eval_kitti_utils import (
     generate_depth_map,
     read_text_lines,
     read_file_data,
@@ -9,43 +9,25 @@ from godard import (
     compute_errors,
 )
 
-parser = argparse.ArgumentParser(description="Evaluation on the KITTI dataset")
-parser.add_argument(
-    "--predicted_disp_path",
-    type=str,
-    help="path to estimated disparities",
-    required=True,
-)
-parser.add_argument(
-    "--gt_path", type=str, help="path to ground truth disparities", required=True
-)
-parser.add_argument(
-    "--min_depth", type=float, help="minimum depth for evaluation", default=1e-3
-)
-parser.add_argument(
-    "--max_depth", type=float, help="maximum depth for evaluation", default=80
-)
-parser.add_argument(
-    "--eigen_crop", help="if set, crops according to Eigen NIPS14", action="store_true"
-)
-parser.add_argument(
-    "--garg_crop", help="if set, crops according to Garg  ECCV16", action="store_true"
-)
 
-args = parser.parse_args()
-
-if __name__ == "__main__":
-
-    pred_disparities = np.load(args.predicted_disp_path, allow_pickle=True)
-    # pred_disparities = EvalDataset()
+def main(
+    pred_disparities,
+    gt_path,
+    min_depth=1e-3,
+    max_depth=80,
+    eigen_crop=False,
+    garg_crop=True,
+):
 
     num_samples = 697
-    test_files = read_text_lines(os.path.join(args.gt_path, "eigen_test_files.txt"))
-    gt_files, gt_calib, im_sizes, im_files, cams = read_file_data(
-        test_files, args.gt_path
+
+    text_file_path = path.join(
+        path.dirname(path.abspath(__file__)), "../splits/KITTI/eigen_test_classic.txt"
     )
 
-    num_test = len(im_files)
+    test_files = read_text_lines(text_file_path)
+    gt_files, gt_calib, im_sizes, _im_files, cams = read_file_data(test_files, gt_path)
+
     gt_depths = []
     pred_depths = []
     for t_id in range(num_samples):
@@ -83,17 +65,17 @@ if __name__ == "__main__":
         gt_depth = gt_depths[i]
         pred_depth = pred_depths[i]
 
-        pred_depth[pred_depth < args.min_depth] = args.min_depth
-        pred_depth[pred_depth > args.max_depth] = args.max_depth
+        pred_depth[pred_depth < min_depth] = min_depth
+        pred_depth[pred_depth > max_depth] = max_depth
 
-        mask = np.logical_and(gt_depth > args.min_depth, gt_depth < args.max_depth)
+        mask = np.logical_and(gt_depth > min_depth, gt_depth < max_depth)
 
-        if args.garg_crop or args.eigen_crop:
+        if garg_crop or eigen_crop:
             gt_height, gt_width = gt_depth.shape
 
             # crop used by Garg ECCV16
             # if used on gt_size 370x1224 produces a crop of [-218, -3, 44, 1180]
-            if args.garg_crop:
+            if garg_crop:
                 crop = np.array(
                     [
                         0.40810811 * gt_height,
@@ -103,7 +85,7 @@ if __name__ == "__main__":
                     ]
                 ).astype(np.int32)
             # crop we found by trial and error to reproduce Eigen NIPS14 results
-            elif args.eigen_crop:
+            elif eigen_crop:
                 crop = np.array(
                     [
                         0.3324324 * gt_height,
