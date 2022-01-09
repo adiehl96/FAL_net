@@ -42,21 +42,6 @@ from misc.postprocessing import ms_pp, local_normalization
 def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
 
-    if args.model.isdigit():
-        save_path = os.path.join("test_" + args.dataset, args.model.zfill(10))
-    else:
-        model_number = args.model.split("/")[-2].zfill(10)
-        save_path = os.path.join("test_" + args.dataset, model_number)
-    if args.f_post_process:
-        save_path = save_path + "fpp"
-    if args.ms_post_process:
-        save_path = save_path + "mspp"
-    print("=> Saving to {}".format(save_path))
-
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    utils.display_config(args, save_path)
-
     input_transform = transforms.Compose(
         [
             data_transforms.ArrayToTensor(),
@@ -89,7 +74,6 @@ def main(args, device="cpu"):
     print("len(test_dataset)", len(test_dataset))
     # Torch Data Loader
     args.batch_size = 1  # kitty mixes image sizes!
-    args.sparse = True  # disparities are sparse (from lidar)
     val_loader = torch.utils.data.DataLoader(
         test_dataset,
         batch_size=args.batch_size,
@@ -99,16 +83,7 @@ def main(args, device="cpu"):
     )
 
     # create pan model
-    if args.model.isdigit():
-        model_path = os.path.join(
-            args.dataset + "_stage2", args.model.zfill(10), "model_best.pth.tar"
-        )
-        if not os.path.exists(model_path):
-            model_path = os.path.join(
-                args.dataset + "_stage2", args.model.zfill(10), "checkpoint.pth.tar"
-            )
-    else:
-        model_path = args.model
+    model_path = args.model
 
     print(model_path)
 
@@ -125,7 +100,7 @@ def main(args, device="cpu"):
 
     print("len(val_loader)", len(val_loader))
     # evaluate on validation set
-    validate(args, val_loader, pan_model, save_path, model_parameters, device)
+    validate(args, val_loader, pan_model, args.save_path, model_parameters, device)
 
 
 def validate(args, val_loader, pan_model, save_path, model_param, device):
@@ -291,36 +266,35 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                                 np.rint(feature).astype(np.uint8),
                             )
 
-            if args.evaluate:
-                # Record kitti metrics
-                target_disp = target.squeeze(1).cpu().numpy()
-                pred_disp = disp.squeeze(1).cpu().numpy()
-                if (
-                    args.dataset == "Kitti_eigen_test_improved"
-                    or args.dataset == "Kitti_eigen_test_original"
-                    or args.dataset == "KITTI"
-                ):
-                    target_depth, pred_depth = utils.disps_to_depths_kitti(
-                        target_disp, pred_disp
-                    )
-                    kitti_erros.update(
-                        utils.compute_kitti_errors(
-                            target_depth[0], pred_depth[0], use_median=args.median
-                        ),
-                        target.size(0),
-                    )
-                if args.dataset == "Kitti2015":
-                    EPE = realEPE(disp, target, sparse=True)
-                    EPEs.update(EPE.detach(), target.size(0))
-                    target_depth, pred_depth = utils.disps_to_depths_kitti2015(
-                        target_disp, pred_disp
-                    )
-                    kitti_erros.update(
-                        utils.compute_kitti_errors(
-                            target_depth[0], pred_depth[0], use_median=args.median
-                        ),
-                        target.size(0),
-                    )
+            # Record kitti metrics
+            target_disp = target.squeeze(1).cpu().numpy()
+            pred_disp = disp.squeeze(1).cpu().numpy()
+            if (
+                args.dataset == "Kitti_eigen_test_improved"
+                or args.dataset == "Kitti_eigen_test_original"
+                or args.dataset == "KITTI"
+            ):
+                target_depth, pred_depth = utils.disps_to_depths_kitti(
+                    target_disp, pred_disp
+                )
+                kitti_erros.update(
+                    utils.compute_kitti_errors(
+                        target_depth[0], pred_depth[0], use_median=False
+                    ),
+                    target.size(0),
+                )
+            if args.dataset == "Kitti2015":
+                EPE = realEPE(disp, target, sparse=True)
+                EPEs.update(EPE.detach(), target.size(0))
+                target_depth, pred_depth = utils.disps_to_depths_kitti2015(
+                    target_disp, pred_disp
+                )
+                kitti_erros.update(
+                    utils.compute_kitti_errors(
+                        target_depth[0], pred_depth[0], use_median=False
+                    ),
+                    target.size(0),
+                )
 
             if i % args.print_freq == 0:
                 print(
@@ -335,6 +309,5 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
         f.write("\nEPE {}\n".format(EPEs.avg))
         f.write("\nKitti metrics: \n{}\n".format(kitti_erros))
 
-    if args.evaluate:
-        print("* EPE: {0}".format(EPEs.avg))
-        print(kitti_erros)
+    print("* EPE: {0}".format(EPEs.avg))
+    print(kitti_erros)

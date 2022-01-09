@@ -16,36 +16,8 @@ from misc import utils, data_transforms
 from misc.postprocessing import ms_pp
 
 
-def predict(parser, device="cpu"):
+def predict(args, device="cpu"):
     print("-------Predicting on " + str(device) + "-------")
-
-    parser.add_argument(
-        "-sp", "--save_path", help="Path that outputs will be saved to", required=True
-    )
-
-    parser.add_argument(
-        "-mp", "--model_path", help="Path that model will be loaded from", required=True
-    )
-
-    parser.add_argument(
-        "--input",
-        dest="input",
-        default="./data/test.png",
-        help="path to the input image to be depth predicted",
-        required=True,
-    )
-
-    parser.add_argument(
-        "-pickle", "--pickle_predictions", action="store_true", default=False
-    )
-
-    args = parser.parse_args()
-
-    print("=> Saving to {}".format(args.save_path))
-
-    if not os.path.exists(args.save_path):
-        os.makedirs(args.save_path, exist_ok=True)
-    utils.display_config(args, args.save_path)
 
     input_transform = transforms.Compose(
         [
@@ -75,16 +47,16 @@ def predict(parser, device="cpu"):
     # Torch Data Loader
     val_loader = torch.utils.data.DataLoader(
         predict_dataset,
-        batch_size=1,  # kitty mixes image sizes!
+        batch_size=1,
         num_workers=args.workers,
         pin_memory=False,
         shuffle=False,
     )
 
-    print(args.model_path)
+    print(args.model)
 
     pan_model = FAL_netB(no_levels=args.no_levels, device=device)
-    checkpoint = torch.load(args.model_path, map_location=device)
+    checkpoint = torch.load(args.model, map_location=device)
     pan_model.load_state_dict(checkpoint["model_state_dict"])
     if device.type == "cuda":
         pan_model = torch.nn.DataParallel(pan_model).to(device)
@@ -108,7 +80,7 @@ def predict(parser, device="cpu"):
         predicte_disparities = []
 
     # Set the max disp
-    right_shift = args.max_disp * args.rel_baset
+    right_shift = args.max_disp * args.relative_baseline
 
     with torch.no_grad():
         for i, input in enumerate(val_loader):

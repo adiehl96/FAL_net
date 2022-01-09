@@ -13,28 +13,11 @@ from misc.dataloader import load_data
 from models.FAL_netB import FAL_netB
 from misc import utils
 from misc.postprocessing import ms_pp
-from test_utils.eval_kitti import main as eval_kitti
+from testing.test_k_eigen_classic_utils import main as eval_kitti
 
 
-def main(parser, device="cpu"):
+def main(args, device="cpu"):
     print("-------Predicting on " + str(device) + "-------")
-
-    parser.add_argument(
-        "-sp", "--save_path", help="Path that outputs will be saved to", default=None
-    )
-
-    parser.add_argument(
-        "-pickle", "--pickle_predictions", action="store_true", default=False
-    )
-
-    args = parser.parse_args()
-
-    if args.save_path:
-        print("=> Saving to {}".format(args.save_path))
-
-        if not os.path.exists(args.save_path):
-            os.makedirs(args.save_path, exist_ok=True)
-        utils.display_config(args, args.save_path)
 
     input_transform = transforms.Compose(
         [
@@ -58,7 +41,7 @@ def main(parser, device="cpu"):
     # Torch Data Loader
     test_loader = torch.utils.data.DataLoader(
         test_dataset,
-        batch_size=1,  # kitty mixes image sizes!
+        batch_size=1,
         num_workers=args.workers,
         pin_memory=False,
         shuffle=False,
@@ -77,16 +60,12 @@ def main(parser, device="cpu"):
     cudnn.benchmark = True
 
     if args.save_path:
-        input_path = os.path.join(args.save_path, "input")
-        if args.save_input and not os.path.exists(input_path):
-            os.makedirs(input_path, exist_ok=True)
-
         pickle_path = os.path.join(args.save_path, "pickle")
         if args.pickle_predictions and not os.path.exists(pickle_path):
             os.makedirs(pickle_path, exist_ok=True)
 
     # Set the max disp
-    right_shift = args.max_disp * args.rel_baset
+    right_shift = args.max_disp * args.relative_baseline
 
     disparities = np.zeros((697, 256, 512), dtype=np.float32)
 
@@ -142,7 +121,10 @@ def main(parser, device="cpu"):
             9.135863e-06,
             0.15535712,
         )
-        eval_kitti(rescaled_disparities, input_path)
+        result = eval_kitti(rescaled_disparities, input_path)
+        print(result)
+        with open(os.path.join(args.save_path, "results.txt"), "w") as f:
+            f.write(result)
 
         if args.pickle_predictions:
             np.save(os.path.join(pickle_path, "predictions.npy"), disparities)

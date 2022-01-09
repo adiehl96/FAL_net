@@ -41,7 +41,7 @@ def flatten(the_lists):
     return result
 
 
-def display_config(args, save_path):
+def print_and_save_config(args):
     settings = ""
     settings = (
         settings + "############################################################\n"
@@ -60,8 +60,8 @@ def display_config(args, save_path):
         settings = settings + "%18s: %s\n" % (str(arg), str(getattr(args, arg)))
     print(settings)
     # Save config in txt file
-    if save_path:
-        with open(os.path.join(save_path, "settings.txt"), "w+") as f:
+    if args.save_path:
+        with open(os.path.join(args.save_path, "settings.txt"), "w+") as f:
             f.write(settings)
 
 

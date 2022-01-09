@@ -41,25 +41,14 @@ def main(args, device="cpu"):
     print("-------Training Stage 1 on " + str(device) + "-------")
     best_rmse = -1
 
-    save_path = os.path.join(args.dataset + "_stage1")
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    _, sub_directories, _ = next(os.walk(save_path))
-    filtered = filter(lambda x: x.isdigit(), sorted(sub_directories))
-    idx = len(list(filtered))
-    save_path = os.path.join(save_path, str(idx).zfill(10))
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-
-    utils.display_config(args, save_path)
-    print("=> will save everything to {}".format(save_path))
-
     # Set output writters for showing up progress on tensorboardX
-    train_writer = SummaryWriter(os.path.join(save_path, "train"))
-    test_writer = SummaryWriter(os.path.join(save_path, "test"))
+    train_writer = SummaryWriter(os.path.join(args.save_path, "train"))
+    test_writer = SummaryWriter(os.path.join(args.save_path, "test"))
     output_writers = []
     for i in range(3):
-        output_writers.append(SummaryWriter(os.path.join(save_path, "test", str(i))))
+        output_writers.append(
+            SummaryWriter(os.path.join(args.save_path, "test", str(i)))
+        )
 
     # Set up data augmentations
     input_transform = data_transforms.ApplyToMultiple(
@@ -112,7 +101,7 @@ def main(args, device="cpu"):
     )
     val_loader = torch.utils.data.DataLoader(
         val_dataset0,
-        batch_size=args.tbatch_size,
+        batch_size=1,
         num_workers=args.workers,
         pin_memory=False,
         shuffle=False,
@@ -150,20 +139,20 @@ def main(args, device="cpu"):
     ]
     if args.optimizer == "adam":
         g_optimizer = torch.optim.Adam(
-            params=param_groups, lr=args.lr1, betas=(args.momentum, args.beta)
+            params=param_groups, lr=args.lr, betas=(args.momentum, args.beta)
         )
 
     vgg_loss = VGGLoss(device=device)
     scaler = GradScaler()
 
-    for epoch in range(args.start_epoch, args.epochs1):
+    for epoch in range(args.start_epoch, args.epochs):
         # train for one epoch
         loss, train_loss = train(
             args, train_loader0, model, g_optimizer, epoch, device, vgg_loss, scaler
         )
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
-        if epoch % args.val_freq == 0 or epoch + 1 == args.epochs1:
+        if epoch % args.val_freq == 0 or epoch + 1 == args.epochs:
             # evaluate on validation set, RMSE is from stereoscopic view synthesis task
             rmse = validate(args, val_loader, model, device, output_transforms)
             test_writer.add_scalar("mean RMSE", rmse, epoch)
@@ -185,7 +174,7 @@ def main(args, device="cpu"):
                     "loss": loss,
                 },
                 is_best,
-                save_path,
+                args.save_path,
             )
 
 
@@ -248,7 +237,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
 
             #  Compute smooth loss
             sm_loss = 0
-            if args.smooth1 > 0:
+            if args.smooth > 0:
                 # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
                 sm_loss = smoothness(
                     left_view[:, :, :, int(0.20 * W) : :],
@@ -258,7 +247,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
                 )
 
             # compute gradient and do optimization step
-            loss = rec_loss + args.smooth1 * sm_loss
+            loss = rec_loss + args.smooth * sm_loss
             losses.update(loss.detach().cpu(), args.batch_size)
         scaler.scale(loss).backward()
         scaler.step(g_optimizer)
@@ -271,7 +260,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
 
         if i == epoch_size - 1 or i % args.print_freq == 0 and not i == 0:
             eta = utils.eta_calculator(
-                batch_time.get_avg(), epoch_size, args.epochs1 - epoch, i
+                batch_time.get_avg(), epoch_size, args.epochs - epoch, i
             )
             print(
                 f"Epoch: [{epoch}][{i}/{epoch_size}] ETA {eta} Batch Time {batch_time}  Loss {losses} RecLoss {rec_losses}"
@@ -289,7 +278,7 @@ def validate(args, val_loader, model, device, output_transforms):
     asm_erros = utils.multiAverageMeter(utils.image_similarity_measures)
 
     # Set the max disp
-    right_shift = args.max_disp * args.rel_baset
+    right_shift = args.max_disp * args.relative_baseline
 
     with torch.no_grad():
         print("with torch.no_grad():")

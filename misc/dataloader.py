@@ -1,4 +1,5 @@
-import os.path, csv, pickle
+import csv, pickle
+import os.path as path
 from misc.listdataset_test import ListDataset as TestListDataset
 from misc.listdataset_train import ListDataset as TrainListDataset
 from misc.listdataset_retrain import ListDataset as RetrainListDataset
@@ -34,16 +35,16 @@ def load_data(split=None, **kwargs):
         splitfilelocation = "./splits/KITTI2015/bello_val.txt"
 
     if dataset == "ASM_stereo_small_train":
-        with open(f"{input_root}/{dataset}", "rb") as fp:
+        with open(path.join(input_root, dataset), "rb") as fp:
             datasetlist = pickle.load(fp)
     elif dataset == "ASM_stereo_small_test":
-        with open(f"{input_root}/{dataset}", "rb") as fp:
+        with open(path.join(input_root, dataset), "rb") as fp:
             datasetlist = pickle.load(fp)
     elif dataset == "ASM_stereo_train":
-        with open(f"{input_root}/{dataset}", "rb") as fp:
+        with open(path.join(input_root, dataset), "rb") as fp:
             datasetlist = pickle.load(fp)
     elif dataset == "ASM_stereo_test":
-        with open(f"{input_root}/{dataset}", "rb") as fp:
+        with open(path.join(input_root, dataset), "rb") as fp:
             datasetlist = pickle.load(fp)
     elif split is not None:
         try:
@@ -85,12 +86,12 @@ def load_data(split=None, **kwargs):
                 ]
 
             if all(
-                map(lambda x: True if x == None else os.path.isfile(x), flatten(files))
+                map(lambda x: True if x == None else path.isfile(x), flatten(files))
             ):
                 datasetlist.append(files)
             else:
                 for item in flatten(files):
-                    if item != None and not os.path.isfile(item):
+                    if item != None and not path.isfile(item):
                         raise Exception(f"Could not load file in location {item}.")
 
     if shuffle_test and isinstance(datasetlist, list):
