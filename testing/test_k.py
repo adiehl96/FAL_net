@@ -52,12 +52,7 @@ def main(args, device="cpu"):
         ]
     )
 
-    target_transform = transforms.Compose(
-        [
-            data_transforms.ArrayToTensor(),
-            transforms.Normalize(mean=[0], std=[1]),
-        ]
-    )
+    target_transform = transforms.Compose([data_transforms.ArrayToTensor()])
 
     # Torch Data Set List
     input_path = os.path.join(args.data_directory, args.dataset)
@@ -304,7 +299,7 @@ def validate(args, val_loader, pan_model, save_path, model_param, device):
                 )
 
     # Save erros and number of parameters in txt file
-    with open(os.path.join(save_path, "errors.txt"), "w+") as f:
+    with open(os.path.join(save_path, "results.txt"), "w+") as f:
         f.write("\nNumber of parameters {}\n".format(model_param))
         f.write("\nEPE {}\n".format(EPEs.avg))
         f.write("\nKitti metrics: \n{}\n".format(kitti_erros))

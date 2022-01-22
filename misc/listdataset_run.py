@@ -20,8 +20,6 @@
 from torch.utils import data
 from PIL import Image
 
-LR_DATASETS = ["Kitti_eigen_test_improved"]
-
 
 class ListDataset(data.Dataset):
     def __init__(

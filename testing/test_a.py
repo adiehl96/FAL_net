@@ -216,7 +216,7 @@ def validate(
                 )
 
     # Save erros and number of parameters in txt file
-    with open(os.path.join(save_path, "errors.txt"), "w+") as f:
+    with open(os.path.join(save_path, "results.txt"), "w+") as f:
         f.write("\nNumber of parameters {}\n".format(model_param))
         f.write("\nEPE {}\n".format(EPEs.avg))
         f.write("\nKitti metrics: \n{}\n".format(asm_erros))

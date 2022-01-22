@@ -21,14 +21,13 @@ import os
 import os.path
 from imageio import imread
 import numpy as np
-import scipy.io as sio
 from PIL import Image
 
 LR_DATASETS = ["Kitti_eigen_test_improved"]
 
 
 def img_loader(path_img):
-    img = imread(path_img)
+    img = Image.open(path_img)
     return img
 
 
@@ -47,18 +46,14 @@ class ListDataset(data.Dataset):
         self,
         path_list,
         disp=False,
-        of=False,
         data_name="Kitti2015",
         transform=None,
         target_transform=None,
-        co_transform=None,
     ):
         self.path_list = path_list
         self.transform = transform
         self.target_transform = target_transform
-        self.co_transform = co_transform
         self.disp = disp
-        self.of = of
         self.data_name = data_name
 
         if data_name == "Kitti2015" or data_name == "Kitti_eigen_test_improved":
@@ -92,8 +87,6 @@ class ListDataset(data.Dataset):
             self.input_loader(inputs[1]),
         ]
 
-        if self.co_transform is not None:
-            inputs, targets = self.co_transform(inputs, targets)
         if self.transform is not None:
             for i in range(len(inputs)):
                 inputs[i] = self.transform(inputs[i])
