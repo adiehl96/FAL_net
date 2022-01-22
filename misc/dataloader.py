@@ -3,7 +3,6 @@ import os.path as path
 from misc.listdataset_test import ListDataset as TestListDataset
 from misc.listdataset_train import ListDataset as TrainListDataset
 from misc.listdataset_retrain import ListDataset as RetrainListDataset
-from misc.listdataset_run import ListDataset as RunListDataset
 
 
 from random import shuffle
@@ -32,9 +31,6 @@ def load_data(split=None, **kwargs):
     dataset = kwargs.pop("dataset")
     transform = kwargs.pop("transform", None)
     target_transform = kwargs.pop("target_transform", None)
-    shuffle_test = kwargs.pop("shuffle_test", False)
-    max_pix = kwargs.pop("max_pix", 100)
-    disp_arg = kwargs.pop("disp", False)
     create_val = kwargs.pop("create_val", False)
 
     if "ASM" in dataset:
@@ -57,34 +53,19 @@ def load_data(split=None, **kwargs):
             datasetlist.append(files)
 
     # datasetlist = datasetlist[:1000]
-    if shuffle_test and isinstance(datasetlist, list):
-        shuffle(datasetlist)
-    elif shuffle_test and isinstance(datasetlist, np.ndarray):
-        np.random.default_rng().shuffle(datasetlist, axis=0)
 
-    if split == "eigen_test_improved" and dataset == "KITTI":
+    if (split == "eigen_test_improved" and dataset == "KITTI") or (
+        split == "bello_val" and dataset == "KITTI2015"
+    ):
         dataset = TestListDataset(
             datasetlist,
-            data_name="Kitti_eigen_test_improved",
+            split=split,
             disp=True,
             transform=transform,
             target_transform=target_transform,
         )
     if split in ["eigen_test_classic", "eigen_train"] and dataset == "KITTI":
-        dataset = TrainListDataset(
-            datasetlist,
-            transform=transform,
-            max_pix=max_pix if split in ["eigen_train"] else None,
-        )
-
-    elif split == "bello_val" and dataset == "KITTI2015":
-        dataset = TestListDataset(
-            datasetlist,
-            data_name="Kitti2015",
-            disp=disp_arg,
-            transform=transform,
-            target_transform=target_transform,
-        )
+        dataset = TrainListDataset(datasetlist, transform=transform)
     elif dataset == "ASM_stereo_small_train" or dataset == "ASM_stereo_train":
         if create_val:
             np.random.default_rng().shuffle(datasetlist, axis=0)
@@ -92,28 +73,13 @@ def load_data(split=None, **kwargs):
             val_list = datasetlist[:val_size]
             datasetlist = datasetlist[val_size:]
 
-            val_set = RetrainListDataset(
-                val_list,
-                transform=transform,
-                max_pix=max_pix,
-            )
+            val_set = RetrainListDataset(val_list, transform=transform)
 
-            dataset = RetrainListDataset(
-                datasetlist,
-                transform=transform,
-                max_pix=max_pix,
-            )
+            dataset = RetrainListDataset(datasetlist, transform=transform)
             return dataset, val_set
         else:
-            dataset = RetrainListDataset(
-                datasetlist,
-                transform=transform,
-                max_pix=max_pix,
-            )
+            dataset = RetrainListDataset(datasetlist, transform=transform)
     elif dataset == "ASM_stereo_small_test" or dataset == "ASM_stereo_test":
-        dataset = RetrainListDataset(
-            datasetlist,
-            transform=transform,
-        )
+        dataset = RetrainListDataset(datasetlist, transform=transform)
 
     return dataset

@@ -25,11 +25,9 @@ class ListDataset(data.Dataset):
         self,
         path_list,
         transform=None,
-        max_pix=None,
     ):
         self.path_list = path_list
         self.transform = transform
-        self.max = max_pix
 
     def __len__(self):
         return len(self.path_list)
@@ -41,7 +39,4 @@ class ListDataset(data.Dataset):
         if self.transform is not None:
             inputs = self.transform(inputs)
 
-        if self.max is None:
-            return inputs
-
-        return inputs, self.max
+        return inputs

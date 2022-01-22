@@ -23,8 +23,6 @@ from imageio import imread
 import numpy as np
 from PIL import Image
 
-LR_DATASETS = ["Kitti_eigen_test_improved"]
-
 
 def img_loader(path_img):
     img = Image.open(path_img)
@@ -36,17 +34,12 @@ def kittidisp_loader(path_img):
     return disp[:, :, np.newaxis]
 
 
-def kittidepth_loader(path_depth):
-    depth = np.load(path_depth)
-    return depth[:, :, np.newaxis]
-
-
 class ListDataset(data.Dataset):
     def __init__(
         self,
         path_list,
         disp=False,
-        data_name="Kitti2015",
+        split="bello_val",
         transform=None,
         target_transform=None,
     ):
@@ -54,16 +47,12 @@ class ListDataset(data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.disp = disp
-        self.data_name = data_name
+        self.split = split
 
-        if data_name == "Kitti2015" or data_name == "Kitti_eigen_test_improved":
+        if split in ["bello_val", "eigen_test_improved"]:
             self.input_loader = img_loader
             if self.disp:
                 self.target_loader = kittidisp_loader
-        elif data_name == "Kitti_eigen_test_original":
-            self.input_loader = img_loader
-            if self.disp:
-                self.target_loader = kittidepth_loader
 
     def __len__(self):
         return len(self.path_list)
@@ -71,7 +60,7 @@ class ListDataset(data.Dataset):
     def __getitem__(self, index):
         inputs, targets = self.path_list[index]
 
-        if self.data_name in LR_DATASETS:
+        if self.split == "eigen_test_improved":
             if self.disp:
                 targets = [
                     self.target_loader(targets[0]),
@@ -90,6 +79,7 @@ class ListDataset(data.Dataset):
         if self.transform is not None:
             for i in range(len(inputs)):
                 inputs[i] = self.transform(inputs[i])
+
         if targets is None:
             return inputs, 0, file_name
 

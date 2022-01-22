@@ -91,15 +91,12 @@ def main(args, device="cpu"):
         dataset=args.dataset,
         root=input_path,
         transform=transform,
-        max_pix=args.max_disp,
     )
     input_path = os.path.join(args.data_directory, args.validation_dataset)
     test_dataset = load_data(
         split=args.validation_split,
         dataset=args.validation_dataset,
         root=input_path,
-        disp=True,
-        shuffle_test=False,
         transform=input_transform,
         target_transform=target_transform,
     )
@@ -204,9 +201,15 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
     end = time.time()
     for i, input_data0 in enumerate(train_loader):
         # Read training data
-        left_view = input_data0[0][0].to(device)
-        right_view = input_data0[0][1].to(device)
-        max_disp = input_data0[1].unsqueeze(1).unsqueeze(1).type(left_view.type())
+        left_view = input_data0[0].to(device)
+        right_view = input_data0[1].to(device)
+        max_disp = (
+            torch.Tensor([args.max_disp * args.relative_baseline])
+            .repeat(args.batch_size)
+            .unsqueeze(1)
+            .unsqueeze(1)
+            .type(left_view.type())
+        )
         _, _, _, W = left_view.shape
 
         # measure data loading time

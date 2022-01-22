@@ -58,7 +58,6 @@ def main(args, device="cpu"):
         root=input_path,
         transform=input_transform,
         co_transform=co_transform,
-        max_pix=args.max_disp,
         create_val=0.1,
     )
     print("len(train_dataset0)", len(train_dataset0))
@@ -168,7 +167,13 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
         # Read training data
         left_view = input_data0[0][0].to(device)
         right_view = input_data0[0][1].to(device)
-        max_disp = input_data0[1].unsqueeze(1).unsqueeze(1).type(left_view.type())
+        max_disp = (
+            torch.Tensor([args.max_disp * args.relative_baseline])
+            .repeat(args.batch_size)
+            .unsqueeze(1)
+            .unsqueeze(1)
+            .type(left_view.type())
+        )
         _, _, _, W = left_view.shape
 
         # measure data loading time

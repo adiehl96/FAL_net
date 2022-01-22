@@ -61,7 +61,6 @@ def main(args, device="cpu"):
         dataset=args.dataset,
         root=input_path,
         disp=True,
-        shuffle_test=False,
         transform=input_transform,
         target_transform=target_transform,
     )

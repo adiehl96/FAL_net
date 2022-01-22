@@ -63,7 +63,6 @@ def main(args, device="cpu"):
     test_dataset = load_data(
         dataset=args.dataset,
         root=args.data_directory,
-        shuffle_test=False,
         transform=input_transform,
     )
 
@@ -140,7 +139,7 @@ def validate(
             flip_grid = F.affine_grid(i_tetha, [B, C, H, W], align_corners=False)
             flip_grid[:, :, :, 0] = -flip_grid[:, :, :, 0]
 
-            # Convert min and max disp to bx1x1 tensors
+            # Convert min and max disp to bx1x1 where b=1 tensors
             max_disp = (
                 torch.Tensor([right_shift])
                 .unsqueeze(1)
