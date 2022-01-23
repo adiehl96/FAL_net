@@ -36,6 +36,13 @@ def main(args, device="cpu"):
     print(f"-------Training Stage {args.stage} on " + str(device) + "-------")
     best_rmse = None
 
+    validate = {
+        "ASM_stereo_small_test": validate_asm,
+        "ASM_stereo_train": validate_asm,
+        "ASM_stereo_test": validate_asm,
+        "KITTI": validate_kitti,
+    }[args.dataset]
+
     # Set output writters for showing up progress on tensorboardX
     train_writer = SummaryWriter(os.path.join(args.save_path, "train"))
     test_writer = SummaryWriter(os.path.join(args.save_path, "test"))
@@ -201,7 +208,7 @@ def main(args, device="cpu"):
 
 
 def train(
-    args, train_loader, model, fix_model, g_optimizer, epoch, device, vgg_loss, scaler
+    args, train_loader, model, fix_model, optimizer, epoch, device, vgg_loss, scaler
 ):
     epoch_size = (
         len(train_loader)
@@ -218,10 +225,10 @@ def train(
     model.train()
 
     end = time.time()
-    for i, (input_data0, _, _) in enumerate(train_loader):
+    for i, (input_data, _, _) in enumerate(train_loader):
         # Read training data
-        left_view = input_data0[0].to(device)
-        right_view = input_data0[1].to(device)
+        left_view = input_data[0].to(device)
+        right_view = input_data[1].to(device)
         max_disp = (
             torch.Tensor([args.max_disp * args.relative_baseline])
             .repeat(args.batch_size)
@@ -236,7 +243,7 @@ def train(
         data_time.update(time.time() - end)
 
         # Reset gradients
-        g_optimizer.zero_grad()
+        optimizer.zero_grad()
 
         # Flip Grid (differentiable)
         if args.stage == 2:
@@ -397,15 +404,15 @@ def train(
             losses.update(loss.detach().cpu(), args.batch_size)
 
         scaler.scale(loss).backward()
-        scaler.step(g_optimizer)
+        scaler.step(optimizer)
         scaler.update()
-        g_optimizer.zero_grad()
+        optimizer.zero_grad()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
+        if i == epoch_size - 1 or i % args.print_freq == 0 and not i == 0:
             eta = utils.eta_calculator(
                 batch_time.get_avg(), epoch_size, args.epochs - epoch, i
             )
@@ -420,7 +427,7 @@ def train(
     return loss, losses.avg
 
 
-def validate(args, val_loader, model, epoch, output_writers, device):
+def validate_kitti(args, val_loader, model, epoch, output_writers, device):
     test_time = utils.AverageMeter()
     RMSES = utils.AverageMeter()
     EPEs = utils.AverageMeter()
@@ -516,3 +523,46 @@ def validate(args, val_loader, model, epoch, output_writers, device):
     print(" * EPE {:.3f}".format(EPEs.avg))
     print(kitti_erros)
     return RMSES.avg
+
+
+def validate_asm(args, val_loader, model, device, output_transforms):
+    batch_time = utils.AverageMeter()
+    asm_erros = utils.multiAverageMeter(utils.image_similarity_measures)
+
+    with torch.no_grad():
+        print("with torch.no_grad():")
+        for i, input_data in enumerate(val_loader):
+            input_left = input_data[0][0].to(device)
+            input_right = input_data[0][1].to(device)
+
+            # Convert min and max disp to bx1x1 tensors
+            max_disp = (
+                torch.Tensor([args.max_disp * args.relative_baseline])
+                .unsqueeze(1)
+                .unsqueeze(1)
+                .type(input_left.type())
+            )
+            min_disp = max_disp * args.min_disp / args.max_disp
+
+            # Synthesis
+            end = time.time()
+
+            pan_im = model(
+                input_left=input_left,
+                min_disp=min_disp,
+                max_disp=max_disp,
+                ret_disp=False,
+                ret_subocc=False,
+                ret_pan=True,
+            )
+
+            # measure elapsed time
+            batch_time.update(time.time() - end, 1)
+
+            for target_im, pred_im in zip(input_right, pan_im):
+                [target_im, pred_im] = output_transforms([target_im, pred_im])
+                errors = utils.compute_asm_errors(target_im, pred_im)
+                asm_erros.update(errors)
+
+    print(asm_erros)
+    return asm_erros.avg[3]

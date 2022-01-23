@@ -63,7 +63,7 @@ def load_data(split=None, **kwargs):
                     raise Exception(f"Could not load file in location {item}.")
             datasetlist.append(files)
 
-    # datasetlist = datasetlist[:100]
+    # datasetlist = datasetlist[:800]
 
     dataset = ListDataset(datasetlist, transform)
     if create_val:

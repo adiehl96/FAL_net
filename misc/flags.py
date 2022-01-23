@@ -72,15 +72,11 @@ def specific_argparse():
                 "ASM_stereo_small_test",
                 "ASM_stereo_train",
                 "ASM_stereo_test",
+                "KITTI2015",
             ],
             required=True,
         )
         args, _ = parser.parse_known_args()
-
-        if args.dataset == "KITTI":
-            script = "mean_k"
-        elif "ASM" in args.dataset:
-            script = "mean_a"
 
         parser.add_argument(
             "--data_directory",
@@ -113,6 +109,7 @@ def specific_argparse():
         parser.add_argument(
             "-b", "--batch_size", metavar="Batch Size", default=1, type=int
         )
+        script = "mean"
 
     if args.modus_operandi == "predict":
         script = "predict"
@@ -281,7 +278,7 @@ def specific_argparse():
                 required=True,
             )
         if args.dataset == "KITTI":
-            script = "traink"
+            script = "train"
             kitti_needed = True
             parser.add_argument(
                 "-trsp",
@@ -321,7 +318,7 @@ def specific_argparse():
             if args.retrain:
                 script = "retrain1a"
             else:
-                script = "train1a"
+                script = "train"
 
     args = parser.parse_args()
     return args, kitti_needed, script

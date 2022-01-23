@@ -33,16 +33,14 @@ from models.FAL_netB import FAL_netB
 
 def main(args, device="cpu"):
     print("-------Training Stage 1 on " + str(device) + "-------")
-    best_rmse = -1
+    best_rmse = None
 
     # Set output writters for showing up progress on tensorboardX
     train_writer = SummaryWriter(os.path.join(args.save_path, "train"))
     test_writer = SummaryWriter(os.path.join(args.save_path, "test"))
-    output_writers = []
-    for i in range(3):
-        output_writers.append(
-            SummaryWriter(os.path.join(args.save_path, "test", str(i)))
-        )
+    output_writers = [
+        SummaryWriter(os.path.join(args.save_path, "test", str(i))) for i in range(3)
+    ]
 
     # Set up data augmentations
     input_transform = ApplyToMultiple(
@@ -74,17 +72,17 @@ def main(args, device="cpu"):
 
     # Torch Data Set List
     input_path = os.path.join(args.data_directory, "ASM_stereo")
-    train_dataset0, val_dataset0 = load_data(
+    train_dataset, val_dataset0 = load_data(
         dataset=args.dataset,
         root=input_path,
         transform=input_transform,
         create_val=0.1,
     )
-    print("len(train_dataset0)", len(train_dataset0))
+    print("len(train_dataset)", len(train_dataset))
 
     # Torch Data Loaders
-    train_loader0 = DataLoader(
-        train_dataset0,
+    train_loader = DataLoader(
+        train_dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
         pin_memory=False,
@@ -97,7 +95,7 @@ def main(args, device="cpu"):
         pin_memory=False,
         shuffle=False,
     )
-    print("len(train_loader0)", len(train_loader0))
+    print("len(train_loader)", len(train_loader))
     print("len(val_loader)", len(val_loader))
 
     # create model
@@ -106,9 +104,9 @@ def main(args, device="cpu"):
         checkpoint = torch.load(args.pretrained, map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
 
-    if torch.cuda.device_count() > 1:
+    if device.type == "cuda":
         print("torch.nn.DataParallel(model).to(device)")
-        model = torch.nn.DataParallel(model)
+        model = torch.nn.DataParallel(model).to(device)
     model.to(device)
     print("=> Number of parameters model '{}'".format(utils.get_n_params(model)))
 
@@ -128,48 +126,46 @@ def main(args, device="cpu"):
             "weight_decay": args.weight_decay,
         },
     ]
-    if args.optimizer == "adam":
-        g_optimizer = torch.optim.Adam(
-            params=param_groups, lr=args.lr, betas=(args.momentum, args.beta)
-        )
+    optimizer = torch.optim.Adam(
+        params=param_groups, lr=args.lr, betas=(args.momentum, args.beta)
+    )
 
     vgg_loss = VGGLoss(device=device)
     scaler = GradScaler()
 
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(args.epochs):
         # train for one epoch
         loss, train_loss = train(
-            args, train_loader0, model, g_optimizer, epoch, device, vgg_loss, scaler
+            args, train_loader, model, optimizer, epoch, device, vgg_loss, scaler
         )
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
         if epoch % args.val_freq == 0 or epoch + 1 == args.epochs:
             # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-            rmse = validate(args, val_loader, model, device, output_transforms)
+            rmse = validate_asm(args, val_loader, model, device, output_transforms)
             test_writer.add_scalar("mean RMSE", rmse, epoch)
 
             # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
             # g_scheduler.step()
 
-            if best_rmse < 0:
-                best_rmse = rmse
-            is_best = rmse < best_rmse
-            best_rmse = min(rmse, best_rmse)
-            utils.save_checkpoint(
-                {
-                    "epoch": epoch,
-                    "model_state_dict": model.module.state_dict()
-                    if isinstance(model, torch.nn.DataParallel)
-                    else model.state_dict(),
-                    "optimizer_state_dict": g_optimizer.state_dict(),
-                    "loss": loss,
-                },
-                is_best,
-                args.save_path,
-            )
+        if best_rmse is None:
+            best_rmse = rmse
+        best_rmse = min(rmse, best_rmse)
+        utils.save_checkpoint(
+            {
+                "epoch": epoch,
+                "model_state_dict": model.module.state_dict()
+                if isinstance(model, torch.nn.DataParallel)
+                else model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": loss,
+            },
+            rmse == best_rmse,
+            args.save_path,
+        )
 
 
-def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scaler):
+def train(args, train_loader, model, optimizer, epoch, device, vgg_loss, scaler):
     epoch_size = (
         len(train_loader)
         if args.epoch_size == 0
@@ -185,10 +181,10 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
     model.train()
 
     end = time.time()
-    for i, ([input_left, input_right]) in enumerate(train_loader):
+    for i, (input_data, _, _) in enumerate(train_loader):
         # Read training data
-        left_view = input_left.to(device)
-        right_view = input_right.to(device)
+        left_view = input_data[0].to(device)
+        right_view = input_data[1].to(device)
         max_disp = (
             torch.Tensor([args.max_disp * args.relative_baseline])
             .repeat(args.batch_size)
@@ -196,17 +192,17 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
             .unsqueeze(1)
             .type(left_view.type())
         )
+        min_disp = max_disp * args.min_disp / args.max_disp
         _, _, _, W = left_view.shape
 
         # measure data loading time
         data_time.update(time.time() - end)
 
         # Reset gradients
-        g_optimizer.zero_grad()
+        optimizer.zero_grad()
 
         with autocast():
             ###### LEFT disp
-            min_disp = max_disp * args.min_disp / args.max_disp
             rpan, ldisp = model(
                 input_left=left_view,
                 min_disp=min_disp,
@@ -243,10 +239,11 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
             # compute gradient and do optimization step
             loss = rec_loss + args.smooth * sm_loss
             losses.update(loss.detach().cpu(), args.batch_size)
+
         scaler.scale(loss).backward()
-        scaler.step(g_optimizer)
+        scaler.step(optimizer)
         scaler.update()
-        g_optimizer.zero_grad()
+        optimizer.zero_grad()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -267,7 +264,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
     return loss, losses.avg
 
 
-def validate(args, val_loader, model, device, output_transforms):
+def validate_asm(args, val_loader, model, device, output_transforms):
     batch_time = utils.AverageMeter()
     asm_erros = utils.multiAverageMeter(utils.image_similarity_measures)
 
