@@ -1,5 +1,6 @@
-# listdataset_test.py Load training images during testing
+# listdataset.py Load training images during testing
 # Copyright (C) 2021  Juan Luis Gonzalez Bello (juanluisgb@kaist.ac.kr)
+# Copyright (C) 2022  Arne Diehl (floaty.press-0k@icloud.com)
 # This software is not for commercial use
 #
 # This program is free software; you can redistribute it and/or modify
@@ -17,8 +18,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import torch.utils.data as data
-import os
-import os.path
+import os.path as path
 from imageio import imread
 import numpy as np
 from PIL import Image
@@ -52,7 +52,7 @@ class ListDataset(data.Dataset):
             targets = []
         else:
             inputs, targets = self.data_list[index]
-            file_name = os.path.basename(inputs[0])[:-4]
+            file_name = path.basename(inputs[0])[:-4]
             inputs = [Image.open(path_img) for path_img in inputs]
             targets = [kittidisp_loader(target) for target in targets]
 

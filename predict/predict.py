@@ -1,25 +1,25 @@
 import os, pickle
 
 import numpy as np
-
 import torch
 import torch.utils.data
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from misc.listdataset_test import ListDataset as RunListDataset
 import matplotlib.pyplot as plt
 
 from models.FAL_netB import FAL_netB
-from misc import utils, data_transforms
+from misc import utils
+from misc.listdataset import ListDataset
 from misc.postprocessing import ms_pp
+from misc.data_utils import ApplyToMultiple, NormalizeInverse
 
 
 def predict(args, device="cpu"):
     print("-------Predicting on " + str(device) + "-------")
 
-    input_transform = data_transforms.ApplyToMultiple(
+    input_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -30,13 +30,13 @@ def predict(args, device="cpu"):
 
     output_transform = transforms.Compose(
         [
-            data_transforms.NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+            NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
             transforms.ToPILImage(),
         ]
     )
 
     # Torch Data Set List
-    predict_dataset = RunListDataset(
+    predict_dataset = ListDataset(
         path_list=[[args.input], []]
         if os.path.isfile(args.input)
         else [

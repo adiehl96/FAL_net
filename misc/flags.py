@@ -72,15 +72,11 @@ def specific_argparse():
                 "ASM_stereo_small_test",
                 "ASM_stereo_train",
                 "ASM_stereo_test",
+                "KITTI2015",
             ],
             required=True,
         )
         args, _ = parser.parse_known_args()
-
-        if args.dataset == "KITTI":
-            script = "mean_k"
-        elif "ASM" in args.dataset:
-            script = "mean_a"
 
         parser.add_argument(
             "--data_directory",
@@ -113,6 +109,7 @@ def specific_argparse():
         parser.add_argument(
             "-b", "--batch_size", metavar="Batch Size", default=1, type=int
         )
+        script = "mean"
 
     if args.modus_operandi == "predict":
         script = "predict"
@@ -242,6 +239,12 @@ def specific_argparse():
         )
         args, _ = parser.parse_known_args()
         parser.add_argument(
+            "-mirror_loss",
+            "--a_mr",
+            default=1 if args.stage == 2 else 0,
+            help="Mirror loss weight",
+        )
+        parser.add_argument(
             "--epochs",
             default=50 if args.stage == 1 else 20,
             type=int,
@@ -269,15 +272,13 @@ def specific_argparse():
         )
         if args.stage == 2:
             parser.add_argument(
-                "-mirror_loss", "--a_mr", default=1, help="Mirror loss weight"
-            )
-            parser.add_argument(
                 "--fix_model",
                 dest="fix_model",
                 default="KITTI_stage1/08-20-13_25/FAL_netB,e50es,b1,lr0.0001/checkpoint.pth.tar",
                 required=True,
             )
         if args.dataset == "KITTI":
+            script = "train"
             kitti_needed = True
             parser.add_argument(
                 "-trsp",
@@ -298,10 +299,6 @@ def specific_argparse():
                 metavar="Name of the validation split of the data to be loaded from the dataset.",
                 default="bello_val",
             )
-            if args.stage == 1:
-                script = "train1k"
-            if args.stage == 2:
-                script = "train2k"
         elif "ASM" in args.dataset:
             parser.add_argument(
                 "--val_freq",
@@ -321,7 +318,7 @@ def specific_argparse():
             if args.retrain:
                 script = "retrain1a"
             else:
-                script = "train1a"
+                script = "train"
 
     args = parser.parse_args()
     return args, kitti_needed, script

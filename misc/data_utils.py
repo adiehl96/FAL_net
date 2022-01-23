@@ -1,6 +1,6 @@
-# data_transforms.py Contains various useful data transformations
-# in a double sized batch input
+# data_utils.py Contains various useful data related functions
 # Copyright (C) 2021  Juan Luis Gonzalez Bello (juanluisgb@kaist.ac.kr)
+# Copyright (C) 2022  Arne Diehl (floaty.press-0k@icloud.com)
 # This software is not for commercial use
 #
 # This program is free software; you can redistribute it and/or modify
@@ -17,11 +17,66 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import random
+import csv, pickle, random
+import os.path as path
+
+import numpy as np
 import torch
 from torchvision import transforms
 from torchvision.transforms.functional import hflip
-import numpy as np
+
+from misc.listdataset import ListDataset
+from misc.functional import flatten, apply
+
+
+def f(x):
+    return {
+        "eigen_test_improved": [[0, 1], [2, 3]],
+        "eigen_test_classic": [[0], []],
+        "eigen_train": [[0, 1], []],
+        "bello_val": [[0, 1, 2, 3], [4, 5]],
+    }[x]
+
+
+def load_data(split=None, **kwargs):
+    input_root = kwargs.pop("root")
+    dataset = kwargs.pop("dataset")
+    transform = kwargs.pop("transform", lambda x: x)
+    val_transform = kwargs.pop("val_transform", lambda x: x)
+    create_val = kwargs.pop("create_val", False)
+
+    if "ASM" in dataset:
+        with open(path.join(input_root, dataset), "rb") as fp:
+            datasetlist = pickle.load(fp)
+    elif split is not None:
+        splitfilelocation = f"./splits/{dataset}/{split}.txt"
+        try:
+            datasetfile = open(splitfilelocation)
+        except:
+            raise Exception(f"Could not open file at {splitfilelocation}.")
+
+        datasetreader = csv.reader(datasetfile, delimiter=",")
+        datasetlist = []
+        for row in datasetreader:
+            files = apply(f(split), lambda x: path.join(input_root, row[x]))
+            for item in flatten(files):
+                if item != None and not path.isfile(item):
+                    raise Exception(f"Could not load file in location {item}.")
+            datasetlist.append(files)
+
+    # datasetlist = datasetlist[:800]
+
+    dataset = ListDataset(datasetlist, transform)
+    if create_val:
+        np.random.default_rng().shuffle(datasetlist, axis=0)
+        val_size = int(len(datasetlist) * create_val)
+
+        dataset = ListDataset(datasetlist[val_size:], transform)
+        val_set = ListDataset(datasetlist[:val_size], val_transform)
+
+        return dataset, val_set
+
+    return dataset
 
 
 class NormalizeInverse(transforms.Normalize):

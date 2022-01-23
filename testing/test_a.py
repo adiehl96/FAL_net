@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from models.FAL_netB import FAL_netB
-from misc.dataloader import load_data
+from misc.data_utils import load_data, ApplyToMultiple, NormalizeInverse
 
 import torch
 import torch.utils.data
@@ -33,13 +33,13 @@ from torch.backends import cudnn
 from torchvision import transforms
 from torch.nn import functional as F
 
-from misc import utils, data_transforms
+from misc import utils
 
 
 def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
 
-    input_transform = data_transforms.ApplyToMultiple(
+    input_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.Resize(size=(320, 320)),
@@ -48,12 +48,10 @@ def main(args, device="cpu"):
             ]
         )
     )
-    output_transforms = data_transforms.ApplyToMultiple(
+    output_transforms = ApplyToMultiple(
         transforms.Compose(
             [
-                data_transforms.NormalizeInverse(
-                    mean=[0.411, 0.432, 0.45], std=[1, 1, 1]
-                ),
+                NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
                 transforms.ToPILImage(),
             ]
         )
@@ -62,7 +60,7 @@ def main(args, device="cpu"):
     # Torch Data Set List
     test_dataset = load_data(
         dataset=args.dataset,
-        root=args.data_directory,
+        root=os.path.join(args.data_directory, "ASM_stereo"),
         transform=input_transform,
     )
 
@@ -127,7 +125,7 @@ def validate(
 
     with torch.no_grad():
         print("with torch.no_grad():")
-        for i, ([input_left, input_right], _max_pix) in enumerate(val_loader):
+        for i, ([input_left, input_right], _, _) in enumerate(val_loader):
 
             input_left = input_left.to(device)
             B, C, H, W = input_left.shape

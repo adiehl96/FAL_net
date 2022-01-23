@@ -1,17 +1,16 @@
 import os
 import time
-import numpy as np
 
-from misc.dataloader import load_data
+from misc.data_utils import load_data, ApplyToMultiple
 from models.FAL_netB import FAL_netB
 
 import torch
-import torch.utils.data
+from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
 from torch.cuda.amp import GradScaler, autocast
 
-from misc import utils, data_transforms
+from misc import utils
 from misc.loss_functions import smoothness, VGGLoss
 
 
@@ -29,7 +28,7 @@ def main(args, device="cpu"):
         )
 
     # Set up data augmentations
-    transform = data_transforms.ApplyToMultiple(
+    transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.RandomResizedCrop(
@@ -61,7 +60,7 @@ def main(args, device="cpu"):
     print("len(val_dataset0)", len(val_dataset0))
 
     # Torch Data Loaders
-    train_loader0 = torch.utils.data.DataLoader(
+    train_loader0 = DataLoader(
         train_dataset0,
         batch_size=args.batch_size,
         num_workers=args.workers,
@@ -71,7 +70,7 @@ def main(args, device="cpu"):
     print("len(train_loader0)", len(train_loader0))
 
     # Torch Data Loaders
-    val_loader0 = torch.utils.data.DataLoader(
+    val_loader0 = DataLoader(
         val_dataset0,
         batch_size=args.batch_size,
         num_workers=args.workers,
