@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from models.FAL_netB import FAL_netB
-from misc.dataloader import load_data
+from misc.data_utils import load_data, ApplyToMultiple
 
 import torch
 import torch.utils.data
@@ -34,7 +34,7 @@ from torch.backends import cudnn
 from torchvision import transforms
 from torch.nn import functional as F
 
-from misc import utils, data_transforms
+from misc import utils
 from misc.loss_functions import realEPE
 from misc.postprocessing import ms_pp, local_normalization
 
@@ -43,7 +43,7 @@ def main(args, device="cpu"):
     print("-------Testing on " + str(device) + "-------")
 
     # Set up data augmentations
-    input_transform = data_transforms.ApplyToMultiple(
+    input_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.ToTensor(),

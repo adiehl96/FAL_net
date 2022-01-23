@@ -17,23 +17,18 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-import os
-import time
-
-from misc.dataloader import load_data
-from models.FAL_netB import FAL_netB
+import os, time
 
 import torch
-import torch.utils.data
+from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
 from torch.cuda.amp import GradScaler, autocast
 
-# Usefull tensorboard call
-# tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
-
-from misc import utils, data_transforms
+from misc import utils
 from misc.loss_functions import smoothness, VGGLoss
+from misc.data_utils import load_data, ApplyToMultiple, NormalizeInverse
+from models.FAL_netB import FAL_netB
 
 
 def main(args, device="cpu"):
@@ -50,7 +45,7 @@ def main(args, device="cpu"):
         )
 
     # Set up data augmentations
-    input_transform = data_transforms.ApplyToMultiple(
+    input_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.RandomResizedCrop(
@@ -68,12 +63,10 @@ def main(args, device="cpu"):
         )
     )
 
-    output_transforms = data_transforms.ApplyToMultiple(
+    output_transforms = ApplyToMultiple(
         transforms.Compose(
             [
-                data_transforms.NormalizeInverse(
-                    mean=[0.411, 0.432, 0.45], std=[1, 1, 1]
-                ),
+                NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
                 transforms.ToPILImage(),
             ]
         )
@@ -90,14 +83,14 @@ def main(args, device="cpu"):
     print("len(train_dataset0)", len(train_dataset0))
 
     # Torch Data Loaders
-    train_loader0 = torch.utils.data.DataLoader(
+    train_loader0 = DataLoader(
         train_dataset0,
         batch_size=args.batch_size,
         num_workers=args.workers,
         pin_memory=False,
         shuffle=True,
     )
-    val_loader = torch.utils.data.DataLoader(
+    val_loader = DataLoader(
         val_dataset0,
         batch_size=1,
         num_workers=args.workers,
@@ -278,18 +271,15 @@ def validate(args, val_loader, model, device, output_transforms):
     batch_time = utils.AverageMeter()
     asm_erros = utils.multiAverageMeter(utils.image_similarity_measures)
 
-    # Set the max disp
-    right_shift = args.max_disp * args.relative_baseline
-
     with torch.no_grad():
         print("with torch.no_grad():")
-        for i, ([input_left, input_right], _max_pix) in enumerate(val_loader):
-
-            input_left = input_left.to(device)
+        for i, input_data in enumerate(val_loader):
+            input_left = input_data[0][0].to(device)
+            input_right = input_data[0][1].to(device)
 
             # Convert min and max disp to bx1x1 tensors
             max_disp = (
-                torch.Tensor([right_shift])
+                torch.Tensor([args.max_disp * args.relative_baseline])
                 .unsqueeze(1)
                 .unsqueeze(1)
                 .type(input_left.type())
@@ -299,11 +289,11 @@ def validate(args, val_loader, model, device, output_transforms):
             # Synthesis
             end = time.time()
 
-            pan_im, _disp = model(
+            pan_im = model(
                 input_left=input_left,
                 min_disp=min_disp,
                 max_disp=max_disp,
-                ret_disp=True,
+                ret_disp=False,
                 ret_subocc=False,
                 ret_pan=True,
             )

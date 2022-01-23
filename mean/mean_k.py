@@ -3,8 +3,7 @@ import os, sys
 import torch
 import torchvision.transforms as transforms
 
-from misc.dataloader import load_data
-from misc import data_transforms
+from misc.data_utils import load_data, ApplyToMultiple
 
 
 def get_mean_and_std(dataloader):
@@ -30,7 +29,7 @@ def main(args, _):
     print(" ".join(sys.argv[:]))
 
     # Set up data augmentations
-    input_transform = data_transforms.ApplyToMultiple(
+    input_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.Resize(

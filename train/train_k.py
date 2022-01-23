@@ -19,7 +19,7 @@
 import os, time
 
 import torch
-import torch.utils.data
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torch.cuda.amp import autocast, GradScaler
@@ -27,9 +27,8 @@ from tensorboardX import SummaryWriter
 import numpy as np
 
 from models.FAL_netB import FAL_netB
-from misc.dataloader import load_data
+from misc.data_utils import load_data, ApplyToMultiple
 from misc import utils
-from misc import data_transforms
 from misc.loss_functions import VGGLoss, realEPE, smoothness
 
 
@@ -45,7 +44,7 @@ def main(args, device="cpu"):
     ]
 
     # Set up data augmentations
-    transform = data_transforms.ApplyToMultiple(
+    transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.RandomResizedCrop(
@@ -74,7 +73,7 @@ def main(args, device="cpu"):
         transform=transform,
     )
 
-    input_transform = data_transforms.ApplyToMultiple(
+    input_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -93,14 +92,14 @@ def main(args, device="cpu"):
     print("len(train_dataset)", len(train_dataset))
 
     # Torch Data Loaders
-    train_loader = torch.utils.data.DataLoader(
+    train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         num_workers=args.workers,
         pin_memory=False,
         shuffle=True,
     )
-    val_loader = torch.utils.data.DataLoader(
+    val_loader = DataLoader(
         val_dataset,
         batch_size=1,
         num_workers=args.workers,
@@ -283,15 +282,15 @@ def train(
                 )
             if args.stage == 2:
                 pan, disp, mask0, mask1 = model(
-                    torch.cat(
+                    input_left=torch.cat(
                         (
                             left_view,
                             F.grid_sample(right_view, flip_grid, align_corners=True),
                         ),
                         0,
                     ),
-                    torch.cat((min_disp, min_disp), 0),
-                    torch.cat((max_disp, max_disp), 0),
+                    min_disp=torch.cat((min_disp, min_disp), 0),
+                    max_disp=torch.cat((max_disp, max_disp), 0),
                     ret_disp=True,
                     ret_pan=True,
                     ret_subocc=True,
@@ -313,11 +312,10 @@ def train(
                 lrmask = F.grid_sample(lrmask, flip_grid, align_corners=True)
 
             # Compute rec loss
-            if args.a_p > 0 and args.stage == 1:
+            if args.a_p > 0:
                 vgg_right = vgg_loss.vgg(right_view)
-            elif args.a_p > 0 and args.stage == 2:
-                vgg_right = vgg_loss.vgg(right_view)
-                vgg_left = vgg_loss.vgg(left_view)
+                if args.stage == 2:
+                    vgg_left = vgg_loss.vgg(left_view)
             else:
                 vgg_right = None
                 vgg_left = None
@@ -332,25 +330,23 @@ def train(
                     O_L = 1
                     O_R = 1
 
-            # Compute rec loss
             # Over 2 as measured twice for left and right
             if args.stage == 1:
                 mask = 1
                 rec_loss = vgg_loss.rec_loss_fnc(
                     mask, rpan, right_view, vgg_right, args.a_p
                 )
-                rec_losses.update(rec_loss.detach().cpu(), args.batch_size)
             elif args.stage == 2:
                 rec_loss = (
                     vgg_loss.rec_loss_fnc(O_R, rpan, right_view, vgg_right, args.a_p)
                     + vgg_loss.rec_loss_fnc(O_L, lpan, left_view, vgg_left, args.a_p)
                 ) / 2
-                rec_losses.update(rec_loss.detach().cpu(), args.batch_size)
+            rec_losses.update(rec_loss.detach().cpu(), args.batch_size)
 
             #  Compute smooth loss
-            if args.stage == 1:
-                sm_loss = 0
-                if args.smooth > 0:
+            sm_loss = 0
+            if args.smooth > 0:
+                if args.stage == 1:
                     # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
                     sm_loss = smoothness(
                         left_view[:, :, :, int(0.20 * W) : :],
@@ -358,45 +354,43 @@ def train(
                         gamma=2,
                         device=device,
                     )
-            elif args.stage == 2:
-                sm_loss = 0
-                if args.smooth > 0:
-                    # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
-                    sm_loss = (
-                        smoothness(
-                            left_view[:, :, :, int(0.20 * W) : :],
-                            ldisp[:, :, :, int(0.20 * W) : :],
-                            gamma=2,
-                            device=device,
-                        )
-                        + smoothness(
-                            right_view[:, :, :, 0 : int(0.80 * W)],
-                            rdisp[:, :, :, 0 : int(0.80 * W)],
-                            gamma=2,
-                            device=device,
-                        )
-                    ) / 2
+                elif args.stage == 2:
+                    sm_loss = 0
+                    if args.smooth > 0:
+                        # Here we ignore the 20% left dis-occluded region, as there is no suppervision for it due to parralax
+                        sm_loss = (
+                            smoothness(
+                                left_view[:, :, :, int(0.20 * W) : :],
+                                ldisp[:, :, :, int(0.20 * W) : :],
+                                gamma=2,
+                                device=device,
+                            )
+                            + smoothness(
+                                right_view[:, :, :, 0 : int(0.80 * W)],
+                                rdisp[:, :, :, 0 : int(0.80 * W)],
+                                gamma=2,
+                                device=device,
+                            )
+                        ) / 2
 
             # Compute mirror loss
             mirror_loss = 0
-            if args.stage == 2:
-
-                if args.a_mr > 0:
-                    # Normalize error ~ between 0-1, by diving over the max disparity value
-                    nmaxl = 1 / F.max_pool2d(mldisp, kernel_size=(H, W))
-                    nmaxr = 1 / F.max_pool2d(mrdisp, kernel_size=(H, W))
-                    mirror_loss = (
-                        torch.mean(
-                            nmaxl
-                            * (1 - O_L)[:, :, :, int(0.20 * W) : :]
-                            * torch.abs(ldisp - mldisp)[:, :, :, int(0.20 * W) : :]
-                        )
-                        + torch.mean(
-                            nmaxr
-                            * (1 - O_R)[:, :, :, 0 : int(0.80 * W)]
-                            * torch.abs(rdisp - mrdisp)[:, :, :, 0 : int(0.80 * W)]
-                        )
-                    ) / 2
+            if args.a_mr > 0:
+                # Normalize error ~ between 0-1, by diving over the max disparity value
+                nmaxl = 1 / F.max_pool2d(mldisp, kernel_size=(H, W))
+                nmaxr = 1 / F.max_pool2d(mrdisp, kernel_size=(H, W))
+                mirror_loss = (
+                    torch.mean(
+                        nmaxl
+                        * (1 - O_L)[:, :, :, int(0.20 * W) : :]
+                        * torch.abs(ldisp - mldisp)[:, :, :, int(0.20 * W) : :]
+                    )
+                    + torch.mean(
+                        nmaxr
+                        * (1 - O_R)[:, :, :, 0 : int(0.80 * W)]
+                        * torch.abs(rdisp - mrdisp)[:, :, :, 0 : int(0.80 * W)]
+                    )
+                ) / 2
 
             # compute gradient and do optimization step
             loss = rec_loss + args.smooth * sm_loss + args.a_mr * mirror_loss
@@ -427,7 +421,6 @@ def train(
 
 
 def validate(args, val_loader, model, epoch, output_writers, device):
-
     test_time = utils.AverageMeter()
     RMSES = utils.AverageMeter()
     EPEs = utils.AverageMeter()

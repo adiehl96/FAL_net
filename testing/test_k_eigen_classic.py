@@ -8,10 +8,10 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from misc.dataloader import load_data
+from misc.data_utils import load_data, ApplyToMultiple
 
 from models.FAL_netB import FAL_netB
-from misc import utils, data_transforms
+from misc import utils
 from misc.postprocessing import ms_pp
 from testing.test_k_eigen_classic_utils import main as eval_kitti
 
@@ -19,7 +19,7 @@ from testing.test_k_eigen_classic_utils import main as eval_kitti
 def main(args, device="cpu"):
     print("-------Predicting on " + str(device) + "-------")
 
-    input_transform = data_transforms.ApplyToMultiple(
+    input_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 # transforms.Resize(
