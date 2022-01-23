@@ -42,6 +42,7 @@ def load_data(split=None, **kwargs):
     input_root = kwargs.pop("root")
     dataset = kwargs.pop("dataset")
     transform = kwargs.pop("transform", lambda x: x)
+    val_transform = kwargs.pop("val_transform", lambda x: x)
     create_val = kwargs.pop("create_val", False)
 
     if "ASM" in dataset:
@@ -70,8 +71,8 @@ def load_data(split=None, **kwargs):
         np.random.default_rng().shuffle(datasetlist, axis=0)
         val_size = int(len(datasetlist) * create_val)
 
-        val_set = ListDataset(datasetlist[:val_size], transform)
         dataset = ListDataset(datasetlist[val_size:], transform)
+        val_set = ListDataset(datasetlist[:val_size], val_transform)
 
         return dataset, val_set
 

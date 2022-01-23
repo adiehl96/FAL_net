@@ -60,7 +60,7 @@ def main(args, device="cpu"):
     # Torch Data Set List
     test_dataset = load_data(
         dataset=args.dataset,
-        root=args.data_directory,
+        root=os.path.join(args.data_directory, "ASM_stereo"),
         transform=input_transform,
     )
 
@@ -125,7 +125,7 @@ def validate(
 
     with torch.no_grad():
         print("with torch.no_grad():")
-        for i, ([input_left, input_right], _max_pix) in enumerate(val_loader):
+        for i, ([input_left, input_right], _, _) in enumerate(val_loader):
 
             input_left = input_left.to(device)
             B, C, H, W = input_left.shape

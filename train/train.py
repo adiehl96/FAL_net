@@ -27,7 +27,7 @@ from tensorboardX import SummaryWriter
 import numpy as np
 
 from models.FAL_netB import FAL_netB
-from misc.data_utils import load_data, ApplyToMultiple
+from misc.data_utils import load_data, ApplyToMultiple, NormalizeInverse
 from misc import utils
 from misc.loss_functions import VGGLoss, realEPE, smoothness
 
@@ -65,22 +65,17 @@ def main(args, device="cpu"):
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.3606, 0.3789, 0.3652], std=[0.3123, 0.3173, 0.3216]
-                ),  # (input - mean) / std
+                )
+                if args.dataset == "KITTI"
+                else transforms.Normalize(
+                    mean=[0.3606, 0.3789, 0.3652], std=[0.3123, 0.3173, 0.3216]
+                ),
             ]
         ),
         RandomHorizontalFlipChance=0.5,
     )
 
-    # Torch Data Set List
-    input_path = os.path.join(args.data_directory, args.dataset)
-    train_dataset = load_data(
-        split=args.train_split,
-        dataset=args.dataset,
-        root=input_path,
-        transform=transform,
-    )
-
-    input_transform = ApplyToMultiple(
+    val_transform = ApplyToMultiple(
         transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -89,14 +84,41 @@ def main(args, device="cpu"):
         )
     )
 
-    input_path = os.path.join(args.data_directory, args.validation_dataset)
-    val_dataset = load_data(
-        split=args.validation_split,
-        dataset=args.validation_dataset,
-        root=input_path,
-        transform=input_transform,
+    output_transforms = ApplyToMultiple(
+        transforms.Compose(
+            [
+                NormalizeInverse(mean=[0.411, 0.432, 0.45], std=[1, 1, 1]),
+                transforms.ToPILImage(),
+            ]
+        )
     )
+
+    if args.dataset == "KITTI":
+        input_path = os.path.join(args.data_directory, args.dataset)
+        train_dataset = load_data(
+            split=args.train_split,
+            dataset=args.dataset,
+            root=input_path,
+            transform=transform,
+        )
+
+        input_path = os.path.join(args.data_directory, args.validation_dataset)
+        val_dataset = load_data(
+            split=args.validation_split,
+            dataset=args.validation_dataset,
+            root=input_path,
+            transform=val_transform,
+        )
+    elif "ASM" in args.dataset:
+        train_dataset, val_dataset = load_data(
+            dataset=args.dataset,
+            root=os.path.join(args.data_directory, "ASM_stereo"),
+            transform=transform,
+            val_transform=val_transform,
+            create_val=0.1,
+        )
     print("len(train_dataset)", len(train_dataset))
+    print("len(val_dataset)", len(val_dataset))
 
     # Torch Data Loaders
     train_loader = DataLoader(
@@ -184,7 +206,9 @@ def main(args, device="cpu"):
         train_writer.add_scalar("train_loss", train_loss, epoch)
 
         # evaluate on validation set, RMSE is from stereoscopic view synthesis task
-        rmse = validate(args, val_loader, model, epoch, output_writers, device)
+        rmse = validate(
+            args, val_loader, model, epoch, output_writers, output_transforms, device
+        )
         test_writer.add_scalar("mean RMSE", rmse, epoch)
 
         # Apply LR schedule (after optimizer.step() has been called for recent pyTorch versions)
@@ -427,7 +451,9 @@ def train(
     return loss, losses.avg
 
 
-def validate_kitti(args, val_loader, model, epoch, output_writers, device):
+def validate_kitti(
+    args, val_loader, model, epoch, output_writers, output_transforms, device
+):
     test_time = utils.AverageMeter()
     RMSES = utils.AverageMeter()
     EPEs = utils.AverageMeter()
@@ -525,7 +551,9 @@ def validate_kitti(args, val_loader, model, epoch, output_writers, device):
     return RMSES.avg
 
 
-def validate_asm(args, val_loader, model, device, output_transforms):
+def validate_asm(
+    args, val_loader, model, epoch, output_writers, output_transforms, device
+):
     batch_time = utils.AverageMeter()
     asm_erros = utils.multiAverageMeter(utils.image_similarity_measures)
 
@@ -547,7 +575,7 @@ def validate_asm(args, val_loader, model, device, output_transforms):
             # Synthesis
             end = time.time()
 
-            pan_im = model(
+            [pan_im] = model(
                 input_left=input_left,
                 min_disp=min_disp,
                 max_disp=max_disp,
