@@ -1,6 +1,6 @@
 import csv, pickle
 import os.path as path
-from misc.listdataset_test import ListDataset as TestListDataset
+from misc.listdataset import ListDataset
 
 from misc.functional import flatten, apply
 import numpy as np
@@ -42,13 +42,13 @@ def load_data(split=None, **kwargs):
 
     # datasetlist = datasetlist[:100]
 
-    dataset = TestListDataset(datasetlist, transform)
+    dataset = ListDataset(datasetlist, transform)
     if create_val:
         np.random.default_rng().shuffle(datasetlist, axis=0)
         val_size = int(len(datasetlist) * create_val)
 
-        val_set = TestListDataset(datasetlist[:val_size], transform)
-        dataset = TestListDataset(datasetlist[val_size:], transform)
+        val_set = ListDataset(datasetlist[:val_size], transform)
+        dataset = ListDataset(datasetlist[val_size:], transform)
 
         return dataset, val_set
 

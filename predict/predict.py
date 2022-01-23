@@ -8,7 +8,7 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from misc.listdataset_test import ListDataset as RunListDataset
+from misc.listdataset import ListDataset
 import matplotlib.pyplot as plt
 
 from models.FAL_netB import FAL_netB
@@ -36,7 +36,7 @@ def predict(args, device="cpu"):
     )
 
     # Torch Data Set List
-    predict_dataset = RunListDataset(
+    predict_dataset = ListDataset(
         path_list=[[args.input], []]
         if os.path.isfile(args.input)
         else [
