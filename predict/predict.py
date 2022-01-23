@@ -8,7 +8,7 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from misc.listdataset_train import ListDataset as RunListDataset
+from misc.listdataset_test import ListDataset as RunListDataset
 import matplotlib.pyplot as plt
 
 from models.FAL_netB import FAL_netB
@@ -37,10 +37,11 @@ def predict(args, device="cpu"):
 
     # Torch Data Set List
     predict_dataset = RunListDataset(
-        path_list=[[args.input]]
+        path_list=[[args.input], []]
         if os.path.isfile(args.input)
         else [
-            [os.path.join(args.input, x)] for x in sorted(next(os.walk(args.input))[2])
+            [[os.path.join(args.input, x)], []]
+            for x in sorted(next(os.walk(args.input))[2])
         ],
         transform=input_transform,
     )
@@ -85,7 +86,7 @@ def predict(args, device="cpu"):
     right_shift = args.max_disp * args.relative_baseline
 
     with torch.no_grad():
-        for i, [input] in enumerate(val_loader):
+        for i, ([input], _, _) in enumerate(val_loader):
             input_left = input.to(device)
             B, C, H, W = input_left.shape
 

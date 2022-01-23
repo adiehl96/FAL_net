@@ -34,7 +34,7 @@ from torch.cuda.amp import GradScaler, autocast
 # tensorboard --logdir=C:ProjectDir/NeurIPS2020_FAL_net/Kitti --port=6012
 
 from misc import utils, data_transforms
-from misc.loss_functions import realEPE, smoothness, VGGLoss
+from misc.loss_functions import smoothness, VGGLoss
 
 
 def main(args, device="cpu"):
@@ -193,7 +193,7 @@ def train(args, train_loader, model, g_optimizer, epoch, device, vgg_loss, scale
     model.train()
 
     end = time.time()
-    for i, ([input_left, input_right], max_pix) in enumerate(train_loader):
+    for i, ([input_left, input_right]) in enumerate(train_loader):
         # Read training data
         left_view = input_left.to(device)
         right_view = input_right.to(device)

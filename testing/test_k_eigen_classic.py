@@ -78,7 +78,7 @@ def main(args, device="cpu"):
     disparities = np.zeros((697, 256, 512), dtype=np.float32)
 
     with torch.no_grad():
-        for i, [input] in enumerate(test_loader):
+        for i, ([input], _, _) in enumerate(test_loader):
             input_left = input.to(device)
             B, C, H, W = input_left.shape
 
