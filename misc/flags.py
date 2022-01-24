@@ -1,5 +1,7 @@
 import argparse
 
+from numpy import require
+
 
 def specific_argparse():
     kitti_needed = False
@@ -67,13 +69,7 @@ def specific_argparse():
             "-d",
             "--dataset",
             metavar="Name of the Dataset to be used.",
-            choices=[
-                "KITTI",
-                "ASM_stereo_small_test",
-                "ASM_stereo_train",
-                "ASM_stereo_test",
-                "KITTI2015",
-            ],
+            choices=["KITTI", "KITTI2015", "ASM_stereo", "ASM_stereo_small"],
             required=True,
         )
         args, _ = parser.parse_known_args()
@@ -128,6 +124,19 @@ def specific_argparse():
 
     if args.modus_operandi == "test":
         parser.add_argument(
+            "-tesp",
+            "--test_split",
+            metavar="Name of the test split of the data to be loaded from the dataset.",
+            choices=[
+                "eigen_test_improved",
+                "eigen_test_classic",
+                "ASM_stereo_small_test",
+                "ASM_stereo_test",
+            ],
+            required=True,
+        )
+
+        parser.add_argument(
             "-fpp",
             "--f_post_process",
             default=False,
@@ -144,17 +153,6 @@ def specific_argparse():
             parser.add_argument(
                 "-save_pc", "--save_pc", action="store_true", default=False
             )
-
-            parser.add_argument(
-                "-tesp",
-                "--test_split",
-                metavar="Name of the test split of the data to be loaded from the dataset.",
-                choices=[
-                    "eigen_test_improved",
-                    "eigen_test_classic",
-                ],
-                required=True,
-            )
             args, _ = parser.parse_known_args()
             if args.test_split == "eigen_test_classic":
                 script = "testk_eigenclassic"
@@ -169,6 +167,15 @@ def specific_argparse():
             script = "testa"
 
     if args.modus_operandi == "train":
+        parser.add_argument(
+            "-trsp",
+            "--train_split",
+            metavar="Name of the train split of the data to be loaded from the dataset.",
+            default="eigen_train",
+            choices=["ASM_stereo_train", "eigen_train"],
+            required=True,
+        )
+
         parser.add_argument(
             "--pretrained",
             dest="pretrained",
@@ -280,12 +287,6 @@ def specific_argparse():
         if args.dataset == "KITTI":
             script = "train"
             kitti_needed = True
-            parser.add_argument(
-                "-trsp",
-                "--train_split",
-                metavar="Name of the train split of the data to be loaded from the dataset.",
-                default="eigen_train",
-            )
             parser.add_argument(
                 "-vds",
                 "--validation_dataset",

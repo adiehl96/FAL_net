@@ -46,9 +46,9 @@ def load_data(split=None, **kwargs):
     create_val = kwargs.pop("create_val", False)
 
     if "ASM" in dataset:
-        with open(path.join(input_root, dataset), "rb") as fp:
+        with open(path.join(input_root, dataset, split), "rb") as fp:
             datasetlist = pickle.load(fp)
-    elif split is not None:
+    elif "KITTI" in dataset:
         splitfilelocation = f"./splits/{dataset}/{split}.txt"
         try:
             datasetfile = open(splitfilelocation)
@@ -58,7 +58,7 @@ def load_data(split=None, **kwargs):
         datasetreader = csv.reader(datasetfile, delimiter=",")
         datasetlist = []
         for row in datasetreader:
-            files = apply(f(split), lambda x: path.join(input_root, row[x]))
+            files = apply(f(split), lambda x: path.join(input_root, dataset, row[x]))
             for item in flatten(files):
                 if item != None and not path.isfile(item):
                     raise Exception(f"Could not load file in location {item}.")

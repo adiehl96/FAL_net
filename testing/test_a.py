@@ -60,7 +60,8 @@ def main(args, device="cpu"):
     # Torch Data Set List
     test_dataset = load_data(
         dataset=args.dataset,
-        root=os.path.join(args.data_directory, "ASM_stereo"),
+        split=args.test_split,
+        root=args.data_directory,
         transform=input_transform,
     )
 
