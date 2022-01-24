@@ -37,7 +37,7 @@ def predict(args, device="cpu"):
 
     # Torch Data Set List
     predict_dataset = ListDataset(
-        path_list=[[args.input], []]
+        data_list=[[args.input], []]
         if os.path.isfile(args.input)
         else [
             [[os.path.join(args.input, x)], []]

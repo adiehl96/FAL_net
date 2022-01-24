@@ -29,25 +29,17 @@ def main(args, _):
     print(" ".join(sys.argv[:]))
 
     bunches = {
-        "ASM_stereo_train": ["ASM_stereo_train", "ASM_stereo_test"],
-        "ASM_stereo_test": ["ASM_stereo_train", "ASM_stereo_test"],
+        "ASM_stereo": ["ASM_stereo_train", "ASM_stereo_test"],
         "KITTI": ["eigen_test_improved", "eigen_test_classic", "eigen_train"],
         "KITTI2015": ["bello_val"],
     }[args.dataset]
 
-    input_path = os.path.join(
-        args.data_directory,
-        "_".join(args.dataset.split("_")[:-1])
-        if "ASM" in args.dataset
-        else args.dataset,
-    )
-
     chained_dataset = []
     for bunch in bunches:
         dataset = load_data(
-            dataset=bunch if "ASM" in args.dataset else args.dataset,
+            dataset=args.dataset,
             split=bunch,
-            root=input_path,
+            root=args.data_directory,
             transform=ApplyToMultiple(transforms.ToTensor()),
         )
 

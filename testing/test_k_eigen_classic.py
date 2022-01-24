@@ -37,11 +37,10 @@ def main(args, device="cpu"):
         )
     )
 
-    input_path = os.path.join(args.data_directory, args.dataset)
     test_dataset = load_data(
         split=args.test_split,
         dataset=args.dataset,
-        root=input_path,
+        root=args.data_directory,
         transform=input_transform,
     )
 
@@ -129,7 +128,9 @@ def main(args, device="cpu"):
             9.135863e-06,
             0.15535712,
         )
-        result = eval_kitti(rescaled_disparities, input_path)
+        result = eval_kitti(
+            rescaled_disparities, os.path.join(args.data_directory, args.dataset)
+        )
         print(result)
         with open(os.path.join(args.save_path, "results.txt"), "w") as f:
             f.write(result)

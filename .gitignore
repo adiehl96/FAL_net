@@ -4,6 +4,7 @@ ASM_stereo_small_retrain1/
 ASM_stereo_train_stage1/
 ASM_stereo_train_retrain1/
 ASM_stereo_train_train
+ASM_stereo_train
 KITTI_stage2/
 KITTI_train1k
 KITTI_train2k

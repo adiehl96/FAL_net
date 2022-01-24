@@ -37,9 +37,8 @@ def main(args, device="cpu"):
     best_rmse = None
 
     validate = {
-        "ASM_stereo_small_test": validate_asm,
-        "ASM_stereo_train": validate_asm,
-        "ASM_stereo_test": validate_asm,
+        "ASM_stereo_small": validate_asm,
+        "ASM_stereo": validate_asm,
         "KITTI": validate_kitti,
     }[args.dataset]
 
@@ -94,25 +93,24 @@ def main(args, device="cpu"):
     )
 
     if args.dataset == "KITTI":
-        input_path = os.path.join(args.data_directory, args.dataset)
         train_dataset = load_data(
             split=args.train_split,
             dataset=args.dataset,
-            root=input_path,
+            root=args.data_directory,
             transform=transform,
         )
 
-        input_path = os.path.join(args.data_directory, args.validation_dataset)
         val_dataset = load_data(
             split=args.validation_split,
             dataset=args.validation_dataset,
-            root=input_path,
+            root=args.data_directory,
             transform=val_transform,
         )
     elif "ASM" in args.dataset:
         train_dataset, val_dataset = load_data(
             dataset=args.dataset,
-            root=os.path.join(args.data_directory, "ASM_stereo"),
+            root=args.data_directory,
+            split=args.train_split,
             transform=transform,
             val_transform=val_transform,
             create_val=0.1,
@@ -591,6 +589,5 @@ def validate_asm(
                 [target_im, pred_im] = output_transforms([target_im, pred_im])
                 errors = utils.compute_asm_errors(target_im, pred_im)
                 asm_erros.update(errors)
-
     print(asm_erros)
     return asm_erros.avg[3]

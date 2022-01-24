@@ -53,11 +53,10 @@ def main(args, device="cpu"):
     )
 
     # Torch Data Set List
-    input_path = os.path.join(args.data_directory, args.dataset)
     test_dataset = load_data(
         split=args.test_split,
         dataset=args.dataset,
-        root=input_path,
+        root=args.data_directory,
         transform=input_transform,
     )
 
